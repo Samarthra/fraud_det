@@ -32,6 +32,18 @@ _Avoid_: Risk level, score
 The agent's conclusion in a Case on whether the activity is suspicious. It informs the Decision and never replaces it.
 _Avoid_: Verdict, finding
 
+**Typology**:
+A named pattern of fraud or legitimate behaviour, defined by the facts that must hold for it. A Typology is proved from Evidence, and its proof cites the records it rests on.
+_Avoid_: Scenario, signature, pattern
+
+**Hard fact**:
+A fact taken directly from a structured field of a source record, or computed from such fields.
+_Avoid_: Signal, indicator
+
+**Text fact**:
+A fact read from free text, which quotes the source's exact words. It can support a legitimate explanation but can never cancel a Hard fact.
+_Avoid_: Extraction, soft fact
+
 **Decision**:
 The Analyst's recorded outcome on a Case, which may change with its history kept. Recommended actions in a Case are not carried out by recording one.
 _Avoid_: Verdict, resolution
