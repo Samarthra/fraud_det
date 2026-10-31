@@ -49,7 +49,7 @@ def timeline(store, alerts: list[Alert], portfolio: str) -> list[TimelineEvent]:
     for row in store.logins_for(accounts):
         if row["outcome"] == "failure" or row["device_id"] in devices:
             add(row["timestamp"], "core_banking", "login", row["login_id"],
-                f"{row['outcome'].capitalize()} login on {row['account_id']} from {row['device_id']}, IP {row['ip']}")
+                f"{'Failed' if row['outcome'] == 'failure' else 'Successful'} login on {row['account_id']} from {row['device_id']}, IP {row['ip']}")
     for row in store.events_for(accounts):
         add(row["at"], "core_banking", "account_event", row["event_id"] or row["type"],
             f"{row['type'].replace('_', ' ').capitalize()} on {row['account_id']}: {row['details']}")
@@ -212,8 +212,10 @@ def history(store, case: Case, alerts: list[Alert]) -> list[HistoryEntry]:
 
     for alert in alerts:
         rules = ", ".join(h.rule for h in alert.rule_hits)
+        sources = ", ".join(r.source_ref for r in alert.supporting_records)
         add(alert.created_at, "alert_raised", "detection",
-            f"{alert.id} classified {alert.risk_level} at score {alert.score}: {rules}")
+            f"{alert.id} classified {alert.risk_level} at score {alert.score}: {rules}."
+            + (f" Source records: {sources}" if sources else ""))
     for link in store.case_links(case.id):
         text = f"{link.alert_id} {link.action}"
         if link.reasons:

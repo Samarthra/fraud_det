@@ -553,6 +553,7 @@ Level 2 adds correlation, consolidation, a Case workspace, evidence history and 
 
 Two Alerts link only through a matching identifier:
 
+- **Loan and the transfer of its proceeds:** always, because `loan_proceeds_transfer` names the application. This holds with no shared device and however long after applying.
 - **Same customer or account, or any identifier they share:** both must be actionable and within 3 days. This keeps everyday Low Alerts out of a Case.
 - **Device, IP or phone across customers:** within 7 days, and not within one household.
 - **Beneficiary across customers:** within 7 days, and one Alert must have `mule_beneficiary`.
@@ -562,7 +563,7 @@ An identifier on more than 8 Alerts proves nothing and is ignored. No Case grows
 - The lead Case is the one already being worked, then the highest-scoring, preferring a transaction so Replay still applies.
 - `case_links` is append-only. An Alert's latest row says where it sits.
 - A Case with a Decision, note, classification or Investigation is never absorbed. Linked Alerts join it instead.
-- A separated Alert returns to its own Case, or stands alone if it never opened one. Consolidation then leaves it alone for good.
+- A separated Alert returns to its own Case, or stands alone if it never opened one. Consolidation then leaves it alone for good. The Case it left keeps it in `separated_alerts`, its history and its report.
 - The lead Alert can't be separated.
 
 ### Prioritisation

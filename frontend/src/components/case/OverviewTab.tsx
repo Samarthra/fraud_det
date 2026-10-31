@@ -74,7 +74,9 @@ export default function OverviewTab({
   onReclassify: (level: RiskLevel, reason: string) => Promise<void>
   onSeparate: (alertId: string, reason: string) => Promise<void>
 }) {
-  const { case: item, alerts = [], reasons = [], classifications = [] } = detail
+  const { case: item, alerts = [], reasons = [], classifications = [], separated_alerts: separated = [], links = [], graph } = detail
+  const entities = new Map<string, string[]>()
+  for (const node of graph?.nodes ?? []) entities.set(node.type, [...(entities.get(node.type) ?? []), node.id])
   const priority = item.priority!
   const indicators = alerts.flatMap((a) => a.rule_hits.map((h) => ({ ...h, alert: a.id })))
   const recommendations = item.decisions.filter((d) => d.decision.endsWith('_recommended'))
@@ -133,6 +135,32 @@ export default function OverviewTab({
           ))}
         </ul>
         {alerts.length > 1 && <p className="text-xs text-slate-500">An Investigation looks into the lead Alert. The others stay here with their original evidence.</p>}
+      </section>
+
+      {separated.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="font-semibold">Separated from this Case ({separated.length})</h2>
+          <ul className="divide-y divide-slate-100 rounded-md border border-slate-200">
+            {separated.map((a) => (
+              <li key={a.id} className="px-3 py-2">
+                <strong>{a.id}</strong> <span className="text-slate-600">{label(a.category)}, {a.account_id}</span>
+                <p className="text-xs text-slate-500">{links.findLast((l) => l.alert_id === a.id && l.action === 'separated')?.note}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="space-y-2">
+        <h2 className="font-semibold">Affected entities ({graph?.nodes.length ?? 0})</h2>
+        <dl className="divide-y divide-slate-100 rounded-md border border-slate-200">
+          {[...entities].map(([type, ids]) => (
+            <div key={type} className="flex gap-3 px-3 py-1.5">
+              <dt className="w-28 shrink-0 text-slate-500">{type === 'ip' ? 'IP address' : label(type)} ({ids.length})</dt>
+              <dd className="break-words">{ids.join(', ')}</dd>
+            </div>
+          ))}
+        </dl>
       </section>
 
       <section className="space-y-2">

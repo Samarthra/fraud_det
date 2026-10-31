@@ -682,6 +682,11 @@ class Store:
     def case_alerts(self, case_id: str) -> list[Alert]:
         return self._case_alerts()[0].get(case_id, [])
 
+    def separated_from(self, case_id: str, current: list[str]) -> list[Alert]:
+        """Alerts an Analyst took out of this Case. Their evidence stays on its record."""
+        ids = {link.alert_id for link in self.case_links(case_id) if link.action == "separated"}
+        return [self.get_alert(alert_id) for alert_id in sorted(ids - set(current))]
+
     def add_note(self, case_id: str, note: Note) -> None:
         self._run("INSERT INTO notes VALUES (?,?)", case_id, note.model_dump_json())
 
@@ -775,6 +780,7 @@ class Store:
             notes=self.notes(case_id),
             classifications=self.classifications(case_id),
             links=self.case_links(case_id),
+            separated_alerts=self.separated_from(case_id, case.alert_ids),
             report=report,
         )
 

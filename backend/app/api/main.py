@@ -296,10 +296,11 @@ def workspace(case_id: str, scope: AnalystScope) -> CaseDetail:
     detail.alert = scoped(detail.alert, scope.portfolio)
     alerts = [scoped(a, scope.portfolio) for a in detail.alerts] or [detail.alert]
     detail.alerts = alerts
+    detail.separated_alerts = [scoped(a, scope.portfolio) for a in detail.separated_alerts]
     detail.reasons = current_reasons(detail.links, detail.case.alert_ids)
     detail.timeline = timeline(store, alerts, scope.portfolio)
     detail.graph = case_graph(store, alerts, scope.portfolio)
-    detail.history = history(store, detail.case, alerts)
+    detail.history = history(store, detail.case, [*alerts, *detail.separated_alerts])
     return detail
 
 
@@ -323,6 +324,7 @@ def case_report(case_id: str, scope: AnalystScope = Depends(current_scope)):
         notice=REPORT_NOTICE,
         case=detail.case,
         alerts=detail.alerts,
+        separated_alerts=detail.separated_alerts,
         grouping_reasons=detail.reasons,
         links=detail.links,
         relationships=detail.graph,

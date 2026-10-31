@@ -128,8 +128,10 @@ def _transactions(data, accounts, first_seen, takeovers, config) -> list[Candida
                 t, when, paid, history, times, payers, first_seen,
                 takeovers.get(account_id, []), rules,
             )
+            proceeds_of = None
             if history:
-                hits += _proceeds_hits(t, when, paid, payouts.get(account_id, []), rules)
+                extra, proceeds_of = _proceeds_hits(t, when, paid, payouts.get(account_id, []), rules)
+                hits += extra
             paid.add(t["beneficiary_id"])
             history.append((when, t["amount"]))
             times.append(when)
@@ -141,6 +143,10 @@ def _transactions(data, accounts, first_seen, takeovers, config) -> list[Candida
                     category = "account_takeover"
                 else:
                     category = "suspicious_transfer"
+                records = [SupportingRecord(kind="transaction", source_ref=t["transaction_id"], data=t)]
+                if proceeds_of:
+                    records.append(SupportingRecord(kind="loan_application",
+                                                    source_ref=proceeds_of["application_id"], data=proceeds_of))
                 candidates.append(
                     Candidate(
                         dedupe_key=f"transaction:{t['transaction_id']}",
@@ -150,7 +156,7 @@ def _transactions(data, accounts, first_seen, takeovers, config) -> list[Candida
                         customer_id=account["customer_id"],
                         account_id=account_id,
                         hits=hits,
-                        records=[SupportingRecord(kind="transaction", source_ref=t["transaction_id"], data=t)],
+                        records=records,
                         at=t["timestamp"],
                         transaction_id=t["transaction_id"],
                         device_id=t.get("device_id"),
@@ -228,9 +234,10 @@ def _disbursements(data, config) -> dict[str, list[dict[str, Any]]]:
     return payouts
 
 
-def _proceeds_hits(t, when, paid, payouts, rules) -> list[RuleHit]:
+def _proceeds_hits(t, when, paid, payouts, rules) -> tuple[list[RuleHit], dict[str, Any] | None]:
+    """The rule hits, and the loan whose money this is, which correlation links on."""
     if t["beneficiary_id"] in paid:
-        return []
+        return [], None
     rule = rules["loan_proceeds_transfer"]
     hits: list[RuleHit] = []
     for payout in payouts:
@@ -243,8 +250,8 @@ def _proceeds_hits(t, when, paid, payouts, rules) -> list[RuleHit]:
                 bank = rules["recent_bank_change"]
                 hits.append(hit("recent_bank_change", bank["points"],
                                 f"Bank details on {t['account_id']} changed within {bank['days']} days before the payout"))
-            break
-    return hits
+            return hits, loan
+    return hits, None
 
 
 def _standalone_logins(accounts, first_seen, takeovers, config) -> list[Candidate]:

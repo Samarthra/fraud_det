@@ -258,6 +258,10 @@ def test_separating_keeps_the_alert_and_outlasts_a_rerun(client):
     assert any(h["event"] == "alert_separated" and "Different customer" in h["summary"] for h in current["history"])
     assert alert_id not in {i for r in current["reasons"] for i in r["alert_ids"]}
     assert alert_id not in " ".join(r["explanation"] for r in current["reasons"])
+    assert alert_id in [a["id"] for a in current["separated_alerts"]]
+    assert any(h["event"] == "alert_raised" and alert_id in h["summary"] for h in current["history"])
+    report = client.get(f"/cases/{case['id']}/report", headers=ONE).json()
+    assert alert_id in [a["id"] for a in report["separated_alerts"]]
 
 
 def test_the_lead_alert_stays_with_its_case(client):
@@ -341,6 +345,31 @@ def test_case_report_downloads_the_evidence_history(client):
     assert client.get(f"/cases/{case['id']}/report", headers=TWO).status_code == 403
     trail = [row["event"] for row in client.get("/audit", headers=ONE).json()]
     assert "report_downloaded" in trail and "alerts_grouped" in trail
+
+
+def test_history_names_source_records(client):
+    history = linked_case(client)["history"]
+    assert any("Source records: TXN-50003" in h["summary"] for h in history)
+
+
+def test_an_uploaded_loan_joins_the_transfer_of_its_proceeds(client):
+    """One applicant, so no shared device: the payout itself has to make the link."""
+    own = next(c for c in main.store.account_rows().values()
+               if c["portfolio"] == "portfolio-1" and c["account_id"].startswith("ACC-30"))
+    account, customer = own["account_id"], own["customer_id"]
+    uploads = {
+        "account_events": f"event_id,account_id,type,at,details\nEVT-X,{account},bank_account_changed,2026-10-19T10:00:00,changed\n",
+        "loan_applications": ("application_id,customer_id,device_id,amount,status,timestamp,ip,phone,disbursed_account_id,disbursed_at\n"
+                              f"APP-X,{customer},DEV-UP,300000,disbursed,2026-10-01T10:00:00,,,{account},2026-10-20T09:00:00\n"),
+        "transactions": ("transaction_id,account_id,beneficiary_id,beneficiary_name,amount,timestamp,channel,status,device_id,ip_country,description\n"
+                         f"TXN-X,{account},BEN-NEW1,New Co,280000,2026-10-20T11:00:00,mobile,completed,DEV-UP,IN,x\n"),
+    }
+    for dataset, text in uploads.items():
+        assert client.post(f"/ingest/{dataset}", headers=ONE, files={"file": ("f.csv", text.encode())}).json()["loaded"] == 1
+    detail = linked_case(client, "TXN-X")
+    assert detail["case"]["products"] == ["core_banking", "lending"]
+    assert "APP-X" in [r["value"] for r in detail["reasons"]]
+    assert detail["case"]["priority"]["exposure"] == 300000
 
 
 def test_policies_and_claims_can_be_uploaded(client):

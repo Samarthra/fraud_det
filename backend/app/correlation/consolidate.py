@@ -8,7 +8,7 @@ from typing import Any
 from contracts import Alert, CaseLink, LinkReason
 
 
-LINK_ORDER = ("account", "customer", "device", "beneficiary", "phone", "ip")  # strongest first
+LINK_ORDER = ("application", "account", "customer", "device", "beneficiary", "phone", "ip")  # strongest first
 OWNER_KINDS = {"account", "customer"}
 SUBJECT_KINDS = {"transaction", "login", "claim", "loan_application"}
 Key = tuple[str, str]
@@ -56,6 +56,7 @@ def identifiers(alert: Alert, accounts: dict[str, dict[str, Any]]) -> set[Key]:
     record = subject_record(alert)
     phone = record.get("phone") or (accounts.get(alert.account_id) or {}).get("phone")
     found = {
+        ("application", alert.application_id),
         ("account", alert.account_id),
         ("customer", alert.customer_id),
         ("device", alert.device_id or record.get("device_id")),
@@ -63,6 +64,9 @@ def identifiers(alert: Alert, accounts: dict[str, dict[str, Any]]) -> set[Key]:
         ("ip", record.get("ip")),
         ("phone", phone),
     }
+    # A transfer of loan proceeds carries the loan it spent, which is a direct link between systems.
+    found |= {("application", r.source_ref) for r in alert.supporting_records
+              if alert.transaction_id and r.kind == "loan_application"}
     return {(kind, value) for kind, value in found if value}
 
 
@@ -71,6 +75,8 @@ def _age(first: Alert, second: Alert) -> timedelta:
 
 
 def _linkable(kind: str, first: Alert, second: Alert, accounts, settings: dict[str, Any]) -> bool:
+    if kind == "application":
+        return True  # one Alert spent this loan's money, however long after applying
     if kind in OWNER_KINDS or first.customer_id == second.customer_id:
         # Sharing an owner is common, and so is using your own phone. Both Alerts must matter on
         # their own and fall close together, or everyday Low Alerts would pile into a Case.
@@ -87,6 +93,8 @@ def _linkable(kind: str, first: Alert, second: Alert, accounts, settings: dict[s
 
 def explain(kind: str, value: str, alert_ids: list[str]) -> str:
     alerts = ", ".join(alert_ids)
+    if kind == "application":
+        return f"{alerts} concern loan {value}: detection traced the transfer to its payout."
     if kind in OWNER_KINDS:
         return f"{alerts} are on the same {kind}, {value}, within the correlation window."
     if kind == "beneficiary":
@@ -115,7 +123,7 @@ def find_groups(alerts: list[Alert], accounts: dict[str, dict[str, Any]], config
     for kind in LINK_ORDER:
         for key in sorted(k for k in by_key if k[0] == kind):
             members = by_key[key]
-            if kind not in OWNER_KINDS and len(members) > settings["hub_limit"]:
+            if kind not in {*OWNER_KINDS, "application"} and len(members) > settings["hub_limit"]:
                 continue
             for first, second in zip(members, members[1:]):
                 if not _linkable(kind, first, second, accounts, settings):

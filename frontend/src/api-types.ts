@@ -628,6 +628,11 @@ export interface components {
              */
             alerts: components["schemas"]["Alert"][];
             /**
+             * Separated Alerts
+             * @default []
+             */
+            separated_alerts: components["schemas"]["Alert"][];
+            /**
              * Reasons
              * @default []
              */
@@ -720,6 +725,8 @@ export interface components {
             case: components["schemas"]["Case"];
             /** Alerts */
             alerts: components["schemas"]["Alert"][];
+            /** Separated Alerts */
+            separated_alerts: components["schemas"]["Alert"][];
             /** Grouping Reasons */
             grouping_reasons: components["schemas"]["LinkReason"][];
             /** Links */

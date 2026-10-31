@@ -300,6 +300,7 @@ class CaseDetail(BaseModel):
     case: Case
     alert: Alert
     alerts: list[Alert] = []
+    separated_alerts: list[Alert] = []  # taken out by an Analyst, kept here as evidence
     reasons: list[LinkReason] = []
     links: list[CaseLink] = []
     notes: list[Note] = []
@@ -319,6 +320,7 @@ class CaseReport(BaseModel):
     notice: str
     case: Case
     alerts: list[Alert]
+    separated_alerts: list[Alert]
     grouping_reasons: list[LinkReason]
     links: list[CaseLink]
     relationships: CaseGraph
