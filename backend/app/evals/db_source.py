@@ -49,6 +49,11 @@ class DbSource:
         )
         self.out_of_scope_account = other["account_id"]
         self.out_of_scope_device = other["device"]
+        self.out_of_scope_beneficiary = next(
+            row["beneficiary_id"]
+            for row in self.store.detection_inputs()["transactions"]
+            if self.store.beneficiary_portfolios(row["beneficiary_id"]) == {"portfolio-2"}
+        )
 
     def _wholly_out_of_scope(self, device_id: str) -> bool:
         """One customer can hold accounts in both Portfolios, which shares their device."""

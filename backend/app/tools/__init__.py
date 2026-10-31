@@ -121,12 +121,16 @@ def build_tools(store: AgentStore, investigation_id: str, scope: AnalystScope) -
         """Get a beneficiary's details and when it was first paid."""
         call_id = started(f"get_beneficiary({beneficiary_id})")
         row = store.get_beneficiary(beneficiary_id)
+        if row and scope.portfolio not in store.beneficiary_portfolios(beneficiary_id):
+            return deny(beneficiary_id)
         return result(call_id, [("beneficiary", beneficiary_id, row)] if row else [])
 
     @tool
     def analyze_relationships(beneficiary_id: str) -> str:
         """Find which accounts paid a beneficiary in the last 7 days."""
         call_id = started(f"analyze_relationships({beneficiary_id})")
+        if scope.portfolio not in store.beneficiary_portfolios(beneficiary_id):
+            return deny(beneficiary_id)
         payments = store.beneficiary_payments(beneficiary_id, days=7)
         graph = nx.Graph()
         graph.add_node(beneficiary_id)

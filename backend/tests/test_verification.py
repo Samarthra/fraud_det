@@ -78,3 +78,11 @@ def test_an_invented_value_still_fails_after_completion():
     draft = ReportDraft(assessment="suspicious", summary="s", limitations=[], recommended_actions=[],
                         findings=[Finding(statement="Sent ₹7,77,777.", evidence_ids=["EV-1"])])
     assert verify(complete_citations(draft, EVIDENCE), EVIDENCE)
+
+
+def test_an_invented_value_in_the_summary_fails():
+    def draft(summary):
+        return ReportDraft(assessment="suspicious", summary=summary, limitations=[], recommended_actions=[],
+                           findings=[Finding(statement="Fine.", evidence_ids=["EV-1"])])
+    assert verify(draft("ACC-10042 sent ₹1,85,000."), EVIDENCE) == []
+    assert "Summary" in verify(draft("ACC-10042 sent ₹9,99,999."), EVIDENCE)[0]

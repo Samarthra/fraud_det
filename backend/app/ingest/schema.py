@@ -47,7 +47,7 @@ DATASETS = {
         "transaction_id",
         (
             Column("transaction_id", "id"),
-            Column("account_id", "id", links_to="account_id"),
+            Column("account_id", "id", links_to="own_account_id"),
             Column("beneficiary_id", "id"),
             Column("beneficiary_name"),
             Column("amount", "amount"),
@@ -64,8 +64,8 @@ DATASETS = {
         "login_id",
         (
             Column("login_id", "id"),
-            Column("account_id", "id", links_to="account_id"),
-            Column("customer_id", "id", links_to="customer_id"),
+            Column("account_id", "id", links_to="own_account_id"),
+            Column("customer_id", "id", links_to="own_customer_id"),
             Column("device_id", "id"),
             Column("ip"),
             Column("timestamp", "timestamp"),
@@ -77,7 +77,7 @@ DATASETS = {
         "application_id",
         (
             Column("application_id", "id"),
-            Column("customer_id", "id", links_to="customer_id"),
+            Column("customer_id", "id", links_to="own_customer_id"),
             Column("device_id", "id"),
             Column("amount", "amount"),
             Column("status", "enum", choices=("submitted", "approved", "rejected", "disbursed")),

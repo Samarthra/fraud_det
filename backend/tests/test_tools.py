@@ -75,3 +75,11 @@ def test_a_device_shared_across_portfolios_shows_only_in_scope_accounts():
     data = json.loads(out)[0]["data"]
     assert data["accounts"] == ["ACC-10042"] and data["out_of_scope_count"] == 1
     assert "ACC-60001" not in out and "ACC-60001" not in str(store.evidence[0].data)
+
+
+def test_beneficiary_only_paid_by_another_portfolio_is_denied():
+    store = FakeStore()
+    for name in ("get_beneficiary", "analyze_relationships"):
+        out = json.loads(tools(store)[name].invoke({"beneficiary_id": "BEN-OUT"}))
+        assert "Access denied" in out["error"]
+    assert store.evidence == []

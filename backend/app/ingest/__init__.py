@@ -8,7 +8,7 @@ from typing import Any
 from contracts import UploadResult
 
 from .parse import OVERFLOW, FileRejected, parse_file
-from .schema import DATASETS
+from .schema import DATASETS, DEFAULT_PORTFOLIO
 from .validate import validate_rows
 
 __all__ = ["DATASETS", "FileRejected", "check_file", "template_csv"]
@@ -19,11 +19,14 @@ def check_file(
     filename: str,
     content: bytes,
     known_ids: Mapping[str, Collection[str]],
+    portfolio: str = DEFAULT_PORTFOLIO,
 ) -> tuple[list[dict[str, Any]], UploadResult]:
     """Returns rows that are safe to insert, and the report to show the Analyst.
 
-    known_ids maps `account_id`, `customer_id` and each dataset's primary key to
-    the values already stored. The caller sets `alerts_created` after detection.
+    known_ids maps each dataset's primary key to every stored value, and
+    `own_account_id` and `own_customer_id` to those in the uploader's Portfolio,
+    so a row can only link to records the uploader may touch. The caller sets
+    `alerts_created` after detection.
     """
     dataset = DATASETS.get(dataset_name)
     if dataset is None:
@@ -36,7 +39,7 @@ def check_file(
     if missing:
         raise FileRejected(f"Missing required column(s): {', '.join(missing)}.")
 
-    valid, rejected, blank = validate_rows(dataset, rows, known_ids)
+    valid, rejected, blank = validate_rows(dataset, rows, known_ids, portfolio)
     return valid, UploadResult(
         dataset=dataset_name,
         filename=filename,
