@@ -39,16 +39,16 @@ export default function Dashboard() {
       <ErrorNote message={error} />
       {stats && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat label="Records processed" value={stats.records_processed.toLocaleString('en-IN')} />
-          <Stat label="Flagged events" value={stats.flagged_events} />
-          <Card title="Risk distribution">
+          <Stat label="Records processed" value={stats.records_processed.toLocaleString('en-IN')} tooltip="Total records processed by detection." />
+          <Stat label="Flagged events" value={stats.flagged_events} tooltip="Events flagged as suspicious." />
+          <Card title="Risk distribution" tooltip="Counts of Alerts by risk level.">
             <div className="space-y-1 text-sm">
               {(['high', 'medium', 'low'] as const).map((level) => (
                 <div key={level} className="flex justify-between"><Risk level={level} /><span className="tabular-nums">{stats.risk_distribution[level] ?? 0}</span></div>
               ))}
             </div>
           </Card>
-          <Card title="Fraud categories">
+          <Card title="Fraud categories" tooltip="Alerts grouped by detection category.">
             <div className="space-y-1 text-sm">
               {Object.entries(stats.fraud_categories).map(([name, count]) => (
                 <div key={name} className="flex justify-between gap-2"><span>{label(name)}</span><span className="tabular-nums">{count}</span></div>
@@ -57,7 +57,7 @@ export default function Dashboard() {
           </Card>
         </div>
       )}
-      <Card title={`Alerts (${alerts.length})`}>
+      <Card title={`Alerts (${alerts.length})`} tooltip="Alerts created by detection; click a row for details.">
         <div className="mb-3 flex flex-wrap gap-2">
           <input aria-label="Customer" placeholder="Customer" className={inputClass} value={filters.customer} onChange={set('customer')} />
           <input aria-label="Transaction" placeholder="Transaction" className={inputClass} value={filters.transaction} onChange={set('transaction')} />
@@ -101,6 +101,7 @@ export default function Dashboard() {
       {selected && (
         <Card
           title={`${selected.id}: why it was flagged`}
+          tooltip="Rule hits and supporting records for this Alert." 
           action={selected.case_id ? <a className="text-sm text-blue-700 underline" href={`#/cases/${selected.case_id}`}>Open {selected.case_id}</a> : <span className="text-sm text-slate-500">Below the actionable threshold, so no Case</span>}
         >
           <ul className="space-y-1 text-sm">

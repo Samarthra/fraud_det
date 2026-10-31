@@ -64,7 +64,7 @@ export default function Evaluations() {
         <Button primary disabled={running} onClick={start}>{running ? 'Eval running…' : 'Run evals'}</Button>
       </div>
       {running && (
-        <Card title="Eval in progress">
+        <Card title="Eval in progress" tooltip="Live progress of the eval run.">
           <p className="text-sm text-slate-600">
             {status?.total ? `${status.done} of ${status.total} cases done, now on ${status.current}` : 'Starting up. Progress appears once the first case begins.'}
           </p>
@@ -85,12 +85,12 @@ export default function Evaluations() {
           {run.detection && (
             <>
               <div className="grid gap-3 sm:grid-cols-4">
-                <Stat label="Precision" value={percent(run.detection.precision)} />
-                <Stat label="Recall" value={percent(run.detection.recall)} />
-                <Stat label="False positives" value={run.detection.false_positives} />
-                <Stat label="Missed fraud" value={run.detection.false_negatives} />
+                <Stat label="Precision" value={percent(run.detection.precision)} tooltip="Share of flagged cases that are fraud." />
+                <Stat label="Recall" value={percent(run.detection.recall)} tooltip="Share of fraud cases caught." />
+                <Stat label="False positives" value={run.detection.false_positives} tooltip="Non-fraud cases flagged." />
+                <Stat label="Missed fraud" value={run.detection.false_negatives} tooltip="Fraud cases not flagged." />
               </div>
-              <Card title="What detection misses">
+              <Card title="What detection misses" tooltip="Fraud stories detection failed to catch.">
                 <ul className="space-y-1 text-sm">
                   {Object.entries(run.detection.misses_by_story).map(([story, count]) => (
                     <li key={story} className="flex justify-between"><span>{label(story)}</span><span className="tabular-nums">{count}</span></li>
@@ -99,7 +99,7 @@ export default function Evaluations() {
               </Card>
             </>
           )}
-          <Card title="Agent">
+          <Card title="Agent" tooltip="Scenario pass rates for the investigation agent.">
             <ul className="space-y-1 text-sm">
               {run.scenarios.map((s) => (
                 <li key={s.name} className="flex items-center justify-between gap-3">
@@ -110,13 +110,13 @@ export default function Evaluations() {
               <li>Held-out Alerts: {run.held_out_correct} of {run.held_out_total} correct</li>
             </ul>
           </Card>
-          <Card title="Security">
+          <Card title="Security" tooltip="Prompt injection and out-of-scope denial results.">
             <ul className="space-y-1 text-sm">
               <li>Prompt injection: {run.injection_passed} of {run.injection_total} passed</li>
               <li>Out-of-scope denials: {run.denials_passed} of {run.denials_total} passed</li>
             </ul>
           </Card>
-          <Card title={`Failed cases (${run.failures.length})`}>
+          <Card title={`Failed cases (${run.failures.length})`} tooltip="Cases that failed eval checks.">
             <ul className="space-y-1.5 text-sm">
               {run.failures.map((f) => (
                 <li key={f.case_id}>

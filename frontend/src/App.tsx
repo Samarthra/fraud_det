@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
-import { api, chooseAnalyst, currentAnalyst, type Analyst } from './api'
+import { api, clearSession, currentAnalyst, currentPassword, type Analyst } from './api'
 import { Button } from './ui'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import CasePage from './pages/CasePage'
 import Cases from './pages/Cases'
 import Dashboard from './pages/Dashboard'
 import Evaluations from './pages/Evaluations'
 import Governance from './pages/Governance'
 import Upload from './pages/Upload'
+import Login from './pages/Login'
 
 const RETRY_MS = 2000
 const NAV = [
@@ -16,6 +19,14 @@ const NAV = [
   ['evaluations', 'Evaluations'],
   ['governance', 'Governance'],
 ]
+
+function avatarUrl(seed: string) {
+  return `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(seed)}`
+}
+
+function initials(name: string) {
+  return name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
+}
 
 function useRoute() {
   const [hash, setHash] = useState(window.location.hash)
@@ -31,6 +42,7 @@ export default function App() {
   const [section = 'dashboard', id] = useRoute()
   const [analysts, setAnalysts] = useState<Analyst[]>([])
   const [analyst, setAnalyst] = useState(currentAnalyst())
+  const [authed, setAuthed] = useState(!!currentPassword())
   const [version, setVersion] = useState(0)
 
   useEffect(() => {
@@ -43,7 +55,16 @@ export default function App() {
   const refresh = () => setVersion((v) => v + 1)
   const page = section || 'dashboard'
 
+  if (!authed) {
+    return (
+      <TooltipProvider>
+        <Login onLogin={() => { setAnalyst(currentAnalyst()); setAuthed(true); refresh() }} />
+      </TooltipProvider>
+    )
+  }
+
   return (
+    <TooltipProvider>
     <div className="min-h-screen">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
@@ -60,20 +81,12 @@ export default function App() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            <select
-              aria-label="Analyst"
-              className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
-              value={analyst}
-              onChange={(e) => {
-                chooseAnalyst(e.target.value)
-                setAnalyst(e.target.value)
-                refresh()
-              }}
-            >
-              {analysts.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
+            <Avatar size="sm">
+              <AvatarImage src={avatarUrl(analyst)} alt={analysts.find((a) => a.id === analyst)?.name ?? analyst} />
+              <AvatarFallback>{initials(analysts.find((a) => a.id === analyst)?.name ?? analyst)}</AvatarFallback>
+            </Avatar>
+            <span className="hidden sm:inline text-sm">{analysts.find((a) => a.id === analyst)?.name ?? analyst}</span>
+            <Button onClick={() => { clearSession(); setAuthed(false); refresh() }}>Log out</Button>
             <Button onClick={() => api.reset().then(refresh)}>Reset demo</Button>
           </div>
         </div>
@@ -87,5 +100,6 @@ export default function App() {
         {page === 'governance' && <Governance />}
       </main>
     </div>
+    </TooltipProvider>
   )
 }
