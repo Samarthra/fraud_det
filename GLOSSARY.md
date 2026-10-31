@@ -16,8 +16,16 @@ _Avoid_: Run, session, chat
 The reviewable report and analyst decision produced by one Investigation. A Case exists even when nothing suspicious is found.
 _Avoid_: Report, ticket, finding
 
+**Assessment**:
+The agent's conclusion in a Case on whether the activity is suspicious. It informs the Decision and never replaces it.
+_Avoid_: Verdict, finding
+
+**Decision**:
+The Analyst's recorded outcome on a Case. Recommended actions in a Case are not carried out by recording one.
+_Avoid_: Verdict, resolution
+
 **Follow-up**:
-A further analyst question within an existing Investigation.
+A further analyst question within an existing Investigation, and its answer. It adds to the Investigation and never changes the Case.
 _Avoid_: New investigation, re-run
 
 **Analyst**:
@@ -25,7 +33,7 @@ The human who reviews a Case and records its decision.
 _Avoid_: User, reviewer, operator
 
 **Evidence**:
-A retrievable source record gathered during an Investigation, which a Case's claims cite by ID.
+A retrievable source record, or a result derived from source records, gathered during an Investigation, which a Case's claims cite by ID.
 _Avoid_: Data, context, citation
 
 **Verification**:
