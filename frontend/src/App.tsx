@@ -116,7 +116,7 @@ export default function App() {
           {page === 'upload' && <Upload />}
           {page === 'dashboard' && <Dashboard />}
           {page === 'cases' && !id && <Cases />}
-          {page === 'cases' && id && <CasePage id={id} />}
+          {page === 'cases' && id && <CasePage key={id} id={id} />}
           {page === 'evaluations' && <Evaluations />}
           {page === 'governance' && <Governance />}
         </main>

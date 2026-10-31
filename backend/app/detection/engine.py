@@ -56,6 +56,7 @@ def hit(rule: str, points: int, reason: str) -> RuleHit:
 
 
 def scan(data: dict[str, list[dict[str, Any]]], config: dict[str, Any]) -> list[Candidate]:
+    data = {**data, **{k: sorted(data[k], key=ts) for k in ("transactions", "logins", "loans")}}
     accounts = {a["account_id"]: a for a in data["accounts"]}
     logins_by_account: dict[str, list] = defaultdict(list)
     for login in data["logins"]:

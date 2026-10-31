@@ -98,7 +98,10 @@ def build_graph(store: AgentStore, gather: Gather, synthesise: Synthesise):
             f"Device: {alert.device_id or 'none'}. Rules that fired: {reasons}."
         )
         store.add_evidence(
-            state["investigation_id"], "alert", alert.id, alert.model_dump(mode="json")
+            state["investigation_id"],
+            "alert",
+            alert.id,
+            alert.model_dump(mode="json", exclude={"supporting_records"}),
         )
         step(state, "triage", "stage_finished", f"{alert.category}, score {alert.score}")
         return {"triage": objective}

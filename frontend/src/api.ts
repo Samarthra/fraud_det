@@ -66,6 +66,13 @@ export type EvalStatus = {
   last_error: string | null
 }
 
+export type Graph = {
+  nodes: { id: string; type: string; label: string }[]
+  edges: { source: string; target: string; label: string }[]
+  more_in_portfolio: number
+  out_of_scope_count: number
+}
+
 export class ApiError extends Error {
   status: number
   constructor(status: number, message: string) {
@@ -118,7 +125,7 @@ let analyst = currentAnalyst()
 let passwordState: string | null = currentPassword()
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers: Record<string, string> = { 'X-Analyst-Id': analyst }
+  const headers: Record<string, string> = {}
   const pwd = passwordState ?? currentPassword()
   if (pwd) {
     try {
@@ -153,7 +160,7 @@ export const api = {
     return a
   },
   stats: () => request<Stats>('/stats'),
-  graph: () => request<{ nodes: {id:string;type:string;label:string}[]; edges: {source:string;target:string;label:string}[] }>('/graph'),
+  graph: (accountId: string) => request<Graph>(`/graph?account_id=${encodeURIComponent(accountId)}`),
   alerts: (filters: Record<string, string>) => {
     const set = Object.entries(filters).filter(([, value]) => value)
     return request<Alert[]>(`/alerts?${new URLSearchParams(set)}`)

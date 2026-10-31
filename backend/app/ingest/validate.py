@@ -11,6 +11,7 @@ from .parse import OVERFLOW
 from .schema import DEFAULT_PORTFOLIO, Column, Dataset
 
 IST = timezone(timedelta(hours=5, minutes=30))
+MAX_AMOUNT = Decimal("1e15")
 
 
 def is_blank(value: Any) -> bool:
@@ -97,6 +98,8 @@ def _amount(column: Column, value: Any) -> tuple[Any, str | None]:
         return None, f"{column.name} '{value}' is not a number."
     if not amount.is_finite() or amount <= 0:
         return None, f"{column.name} must be greater than 0."
+    if amount > MAX_AMOUNT:
+        return None, f"{column.name} is too large."
     return float(amount), None
 
 
@@ -107,4 +110,4 @@ def _timestamp(column: Column, value: Any) -> tuple[Any, str | None]:
         return None, f"{column.name} '{value}' is not an ISO date."
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=IST)
-    return parsed.isoformat(), None
+    return parsed.astimezone(IST).isoformat(), None  # one offset, so text order is time order

@@ -138,3 +138,13 @@ def test_portfolio_defaults_and_is_validated():
 @pytest.mark.parametrize("name", DATASETS)
 def test_templates_list_every_column(name):
     assert template_csv(name).strip().split(",") == DATASETS[name].column_names
+
+
+def test_an_amount_too_large_to_store_is_rejected():
+    rows, result = check(txns("TXN-1,ACC-1,BEN-1,Asha,1e309,2026-10-30,mobile,completed"))
+    assert rows == [] and "too large" in result.rejected[0].reasons[0]
+
+
+def test_timestamps_are_stored_in_one_offset():
+    rows, _ = check(txns("TXN-1,ACC-1,BEN-1,Asha,5,2026-10-30T10:00:00+00:00,mobile,completed"))
+    assert rows[0]["timestamp"] == "2026-10-30T15:30:00+05:30"

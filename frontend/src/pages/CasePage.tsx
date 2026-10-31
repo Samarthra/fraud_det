@@ -10,6 +10,7 @@ function useSteps(investigationId: string | null, tick: number) {
   const [queue, setQueue] = useState<Step[]>([])
   const [shown, setShown] = useState(0)
   const [investigation, setInvestigation] = useState<Investigation | null>(null)
+  const [pollFailed, setPollFailed] = useState(false)
   const after = useRef(0)
   const started = useRef<string | null>(null)
 
@@ -24,22 +25,28 @@ function useSteps(investigationId: string | null, tick: number) {
     let stop = false
     async function poll() {
       while (!stop) {
-        const [steps, current] = await Promise.all([
-          api.steps(investigationId!, after.current),
-          api.investigation(investigationId!),
-        ])
-        if (stop) return
-        if (steps.length) {
-          after.current = steps[steps.length - 1].seq
-          setQueue((q) => [...q, ...steps])
+        try {
+          const [steps, current] = await Promise.all([
+            api.steps(investigationId!, after.current),
+            api.investigation(investigationId!),
+          ])
+          if (stop) return
+          if (steps.length) {
+            after.current = steps[steps.length - 1].seq
+            setQueue((q) => [...q, ...steps])
+          }
+          setInvestigation(current)
+          setPollFailed(false)
+          const answering = current.follow_ups.some((f) => f.answer === null)
+          if (current.status === 'complete' && !answering) return
+        } catch {
+          if (stop) return
+          setPollFailed(true) // keep trying, so one failure can't freeze the page
         }
-        setInvestigation(current)
-        const answering = current.follow_ups.some((f) => f.answer === null)
-        if (current.status === 'complete' && !answering) return
         await new Promise((resolve) => setTimeout(resolve, POLL_MS))
       }
     }
-    poll().catch(() => undefined)
+    poll()
     return () => {
       stop = true
     }
@@ -56,7 +63,7 @@ function useSteps(investigationId: string | null, tick: number) {
   }, [investigationId])
 
   const finished = investigation?.status === 'complete' && shown >= queue.length
-  return { steps: queue.slice(0, shown), investigation, finished, refresh }
+  return { steps: queue.slice(0, shown), investigation, finished, refresh, pollFailed }
 }
 
 function EvidenceRow({ evidence, open }: { evidence: Evidence; open: boolean }) {
@@ -80,7 +87,7 @@ export default function CasePage({ id }: { id: string }) {
   const [question, setQuestion] = useState('')
   const [openEvidence, setOpenEvidence] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
-  const { steps, investigation, finished, refresh } = useSteps(investigationId, tick)
+  const { steps, investigation, finished, refresh, pollFailed } = useSteps(investigationId, tick)
 
   const load = useCallback(() => {
     api.caseDetail(id)
@@ -154,7 +161,7 @@ export default function CasePage({ id }: { id: string }) {
           )}
 
           {investigationId && (
-            <Card title="Agent steps" action={running ? <span className="text-sm text-slate-500">Working…</span> : undefined}>
+            <Card title="Agent steps" action={running ? <span className="text-sm text-slate-500">{pollFailed ? 'Lost contact, retrying…' : 'Working…'}</span> : undefined}>
               <ol className="space-y-1 text-sm">
                 {steps.map((s) => (
                   <li key={s.seq} className="flex items-start gap-3">
@@ -177,6 +184,11 @@ export default function CasePage({ id }: { id: string }) {
                 </div>
               }
             >
+              {!report.assessment && (
+                <div className="mb-2">
+                  <Button primary onClick={() => act(async () => setInvestigationId((await api.investigate(id, false)).investigation_id))}>Investigate again</Button>
+                </div>
+              )}
               {report.assessment && <p className="mb-2 text-sm"><span className="text-slate-500">Assessment:</span> <strong>{label(report.assessment)}</strong></p>}
               <p className="text-sm">{report.summary}</p>
               {unverified && report.verification_errors.length > 0 && (

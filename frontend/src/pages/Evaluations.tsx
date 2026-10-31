@@ -11,6 +11,7 @@ export default function Evaluations() {
 
   const [status, setStatus] = useState<EvalStatus | null>(null)
   const [wasRunning, setWasRunning] = useState(false)
+  const [pollFailed, setPollFailed] = useState(false)
 
   const loadRun = useCallback(() => {
     api.evals()
@@ -27,17 +28,22 @@ export default function Evaluations() {
     let stop = false
     async function poll() {
       while (!stop) {
-        const current = await api.evalStatus()
-        if (stop) return
-        setStatus(current)
-        setWasRunning((before) => {
-          if (before && !current.running) loadRun()
-          return current.running
-        })
+        try {
+          const current = await api.evalStatus()
+          if (stop) return
+          setStatus(current)
+          setPollFailed(false)
+          setWasRunning((before) => {
+            if (before && !current.running) loadRun()
+            return current.running
+          })
+        } catch {
+          if (!stop) setPollFailed(true) // keep trying, the run carries on regardless
+        }
         await new Promise((resolve) => setTimeout(resolve, POLL_MS))
       }
     }
-    poll().catch(() => undefined)
+    poll()
     return () => {
       stop = true
     }
@@ -71,6 +77,7 @@ export default function Evaluations() {
           <div className="mt-2 h-2 overflow-hidden rounded bg-slate-200">
             <div className="h-full bg-blue-700" style={{ width: `${share}%` }} />
           </div>
+          {pollFailed && <p className="mt-2 text-sm text-amber-800">Lost contact with the server. Retrying…</p>}
           <p className="mt-2 text-xs text-slate-500">You can leave this page. The run continues, and the results below update when it finishes.</p>
         </Card>
       )}

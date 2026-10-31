@@ -87,3 +87,22 @@ def test_generation_is_repeatable():
 
 def test_labels_are_not_reachable_from_tool_helpers(store):
     assert "is_fraud" not in str(store.get_transactions("ACC-10042"))
+
+
+def test_login_pattern_is_found_across_mixed_timezone_offsets():
+    data = {
+        "accounts": [{"account_id": "A", "customer_id": "C", "name": "N", "address": "X", "portfolio": "p"}],
+        "transactions": [],
+        "loans": [],
+        "logins": [
+            {"login_id": f"L{i}", "account_id": "A", "customer_id": "C", "device_id": "D", "ip": "1",
+             "timestamp": stamp, "outcome": outcome}
+            for i, (stamp, outcome) in enumerate([
+                ("2026-10-30T15:31:00+05:30", "failure"),   # 10:01 UTC
+                ("2026-10-30T10:02:00+00:00", "failure"),
+                ("2026-10-30T15:33:00+05:30", "failure"),
+                ("2026-10-30T10:04:00+00:00", "success"),
+            ])
+        ],
+    }
+    assert any(c.category == "repeated_login_failures" for c in scan(data, load_config()))

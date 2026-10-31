@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { api, type Alert, type Stats } from '../api'
+import { api, type Alert, type Graph, type Stats } from '../api'
+import EntityGraph from '../components/EntityGraph'
 import { Button, Card, ErrorNote, Risk, Stat, inputClass, label, when } from '../ui'
 
 const EMPTY = { customer: '', transaction: '', product: '', risk_level: '', date_from: '', date_to: '', detection_type: '' }
@@ -16,20 +17,47 @@ export default function Dashboard() {
   const [selected, setSelected] = useState<Alert | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [rerun, setRerun] = useState<string | null>(null)
+  const [runs, setRuns] = useState(0)
   const [page, setPage] = useState(1)
-  const [graph, setGraph] = useState<{ nodes: { id: string; type: string }[]; edges: { source: string; target: string }[] } | null>(null)
+  const [graph, setGraph] = useState<Graph | null>(null)
 
   useEffect(() => {
     api.stats().then(setStats).catch((e) => setError(e.message))
-  }, [rerun])
+  }, [runs])
 
   useEffect(() => {
-    api.alerts(filters).then((rows) => { setAlerts(rows); setPage(1) }).catch((e) => setError(e.message))
-  }, [filters, rerun])
+    let current = true // a slower, older response must not overwrite these filters
+    api.alerts(filters)
+      .then((rows) => {
+        if (!current) return
+        setAlerts(rows)
+        setPage(1)
+      })
+      .catch((e) => {
+        if (current) setError(e.message)
+      })
+    return () => {
+      current = false
+    }
+  }, [filters, runs])
 
   useEffect(() => {
-    api.graph().then(setGraph).catch(() => setGraph(null))
-  }, [rerun])
+    if (selected) document.getElementById('alert-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [selected])
+
+  const focus = selected ?? alerts[0] ?? null
+  const focusAccount = focus?.account_id
+
+  useEffect(() => {
+    if (!focusAccount) return
+    let current = true
+    api.graph(focusAccount)
+      .then((g) => { if (current) setGraph(g) })
+      .catch(() => { if (current) setGraph(null) })
+    return () => {
+      current = false
+    }
+  }, [focusAccount, runs])
 
   const set = (key: keyof typeof EMPTY) => (e: { target: { value: string } }) =>
     setFilters((f) => ({ ...f, [key]: e.target.value }))
@@ -38,23 +66,13 @@ export default function Dashboard() {
   const currentPage = Math.min(page, totalPages)
   const pageRows = alerts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
-  const graphNodes = graph?.nodes ?? []
-  const radius = 150
-  const cx = 260
-  const cy = 180
-  const positioned = graphNodes.map((n, i) => {
-    const angle = (i / Math.max(1, graphNodes.length)) * Math.PI * 2
-    return { ...n, x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) }
-  })
-  const nodeMap = new Map(positioned.map((n) => [n.id, n]))
-
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <div className="flex items-center gap-3">
           {rerun && <span className="text-sm text-slate-600">{rerun}</span>}
-          <Button onClick={() => api.rerun().then((r) => setRerun(`Detection re-run: ${r.alerts_created} new Alerts`))}>Re-run detection</Button>
+          <Button onClick={() => api.rerun().then((r) => { setRerun(`Detection re-run: ${r.alerts_created} new Alerts`); setRuns((n) => n + 1) })}>Re-run detection</Button>
         </div>
       </div>
       <ErrorNote message={error} />
@@ -84,64 +102,6 @@ export default function Dashboard() {
           </Card>
         </div>
       )}
-      <Card title="Relationship graph" tooltip="Accounts, devices and beneficiaries connected by transactions.">
-        <div className="overflow-x-auto">
-          <svg viewBox="0 0 520 360" className="h-80 w-full min-w-[520px]">
-            <defs>
-              <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
-              </marker>
-            </defs>
-            {graph?.edges.map((e, i) => {
-              const a = nodeMap.get(e.source)
-              const b = nodeMap.get(e.target)
-              if (!a || !b) return null
-              return (
-                <line
-                  key={i}
-                  x1={a.x}
-                  y1={a.y}
-                  x2={b.x}
-                  y2={b.y}
-                  stroke="#94a3b8"
-                  strokeWidth="1.5"
-                  markerEnd="url(#arrow)"
-                  opacity="0.7"
-                />
-              )
-            })}
-            {positioned.map((n) => {
-              if (n.type === 'account') {
-                return (
-                  <g key={n.id}>
-                    <rect x={n.x - 9} y={n.y - 9} width="18" height="18" rx="4" fill="#0f172a" stroke="#fff" strokeWidth="1.5" />
-                    <text x={n.x} y={n.y + 22} fontSize="9" textAnchor="middle" fill="#334155">{n.id}</text>
-                  </g>
-                )
-              }
-              if (n.type === 'device') {
-                return (
-                  <g key={n.id}>
-                    <circle cx={n.x} cy={n.y} r="8" fill="#2563eb" stroke="#fff" strokeWidth="1.5" />
-                    <text x={n.x} y={n.y + 22} fontSize="9" textAnchor="middle" fill="#334155">{n.id}</text>
-                  </g>
-                )
-              }
-              return (
-                <g key={n.id}>
-                  <polygon points={`${n.x},${n.y - 9} ${n.x + 9},${n.y} ${n.x},${n.y + 9} ${n.x - 9},${n.y}`} fill="#dc2626" stroke="#fff" strokeWidth="1.5" />
-                  <text x={n.x} y={n.y + 22} fontSize="9" textAnchor="middle" fill="#334155">{n.id}</text>
-                </g>
-              )
-            })}
-          </svg>
-        </div>
-        <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
-          <span><span className="mr-1 inline-block h-3 w-3 rounded-sm bg-slate-900" />Account</span>
-          <span><span className="mr-1 inline-block h-3 w-3 rounded-full bg-blue-600" />Device</span>
-          <span><span className="mr-1 inline-block h-3 w-3 rotate-45 bg-red-600" />Beneficiary</span>
-        </div>
-      </Card>
       <Card title={`Alerts (${alerts.length})`} tooltip="Alerts created by detection; click a row for details." action={
         <div className="flex items-center gap-2 text-sm text-slate-500">
           <span>Page {currentPage} of {totalPages}</span>
@@ -188,6 +148,7 @@ export default function Dashboard() {
           {alerts.length === 0 && <p className="py-4 text-sm text-slate-600">No Alerts match. Load sample data on the Upload page if this is a fresh start.</p>}
         </div>
       </Card>
+      <div id="alert-detail" className="scroll-mt-4 space-y-4">
       {selected && (
         <Card
           title={`${selected.id}: why it was flagged`}
@@ -208,6 +169,8 @@ export default function Dashboard() {
           ))}
         </Card>
       )}
+      {graph && focus && <EntityGraph graph={graph} alert={focus} />}
+      </div>
     </>
   )
 }

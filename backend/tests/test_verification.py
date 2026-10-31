@@ -86,3 +86,22 @@ def test_an_invented_value_in_the_summary_fails():
                            findings=[Finding(statement="Fine.", evidence_ids=["EV-1"])])
     assert verify(draft("ACC-10042 sent ₹1,85,000."), EVIDENCE) == []
     assert "Summary" in verify(draft("ACC-10042 sent ₹9,99,999."), EVIDENCE)[0]
+
+
+def test_a_partial_record_id_fails():
+    assert errors("ACC-1 sent money.")
+    assert errors("TXN-5 was large.")
+
+
+def test_digits_inside_an_id_or_date_do_not_count_as_an_amount():
+    assert "Amount 10042" in errors("Sent 10042.")[0]
+    assert "₹2026" in errors("Sent ₹2026.")[0]
+
+
+def test_a_date_inside_a_timestamp_still_matches():
+    assert errors("Paid on 2026-10-31.") == []
+
+
+def test_decimal_and_small_rupee_amounts_are_checked():
+    assert errors("Sent ₹50.")
+    assert errors("Sent 185000.50.")

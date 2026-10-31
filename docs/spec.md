@@ -195,7 +195,7 @@ The UI polls every 500ms and reveals steps at a minimum of about 700ms each, so 
 | `GET /audit` | Audit trail |
 | `POST /demo/reset` | Clears and reseeds demo data. The audit trail survives |
 
-- The picker sends `X-Analyst-Id`, and the server resolves the Portfolio from it. Anything outside it returns 403 and is audited. `GET /audit` shows only that Portfolio's events. The UI also has a sign-in with public dummy users. Both are demo-grade, not authentication: the API still accepts `X-Analyst-Id` alone, and common passwords are accepted.
+- Every scoped route needs HTTP Basic credentials, and the server resolves the Portfolio from them. Anything outside it returns 403 and is audited. `GET /audit` shows only that Portfolio's events. The sign-in uses public dummy users, so it is demo-grade, not real security: the password is published in the UI and is held in the browser.
 - A Follow-up sent while one is running returns 409.
 
 ### Dashboard

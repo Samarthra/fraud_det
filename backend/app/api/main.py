@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, UploadFile
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
@@ -32,6 +32,7 @@ from contracts import (  # noqa: E402
     StartInvestigation,
     Stats,
     Step,
+    SupportingRecord,
     UploadResult,
 )
 from demo import replay as replays  # noqa: E402
@@ -52,6 +53,8 @@ store = Store(DB_PATH)
 async def lifespan(_: FastAPI) -> Iterator[None]:
     for investigation_id in store.running_investigations():
         store.save_report(investigation_id, empty_report("The Investigation was interrupted."))
+    for follow_up_id in store.pending_follow_ups():
+        store.save_followup_answer(follow_up_id, "This answer was interrupted.", [], "unverified")
     yield
 
 
@@ -67,17 +70,32 @@ app.add_middleware(
 security = HTTPBasic(auto_error=False)
 
 
-def current_scope(credentials: HTTPBasicCredentials | None = Depends(security),
-                  x_analyst_id: str | None = Header(default=None)) -> AnalystScope:
-    analyst_id = x_analyst_id
-    if credentials is not None:
-        analyst_id = store.authenticate(credentials.username, credentials.password)
-        if analyst_id is None:
-            raise HTTPException(401, "Invalid credentials.")
+def current_scope(
+    credentials: HTTPBasicCredentials | None = Depends(security),
+) -> AnalystScope:
+    analyst_id = store.authenticate(credentials.username, credentials.password) if credentials else None
     analyst = store.analyst(analyst_id)
     if analyst is None:
-        raise HTTPException(401, "Pick an Analyst first.")
+        raise HTTPException(401, "Sign in first.")
     return AnalystScope(analyst_id=analyst.id, portfolio=analyst.portfolio)
+
+
+def visible_records(records: list[SupportingRecord], portfolio: str) -> list[SupportingRecord]:
+    """A shared-device or loan Alert can name accounts from another Portfolio."""
+
+    def allowed(record: SupportingRecord) -> bool:
+        account = record.data.get("account_id")
+        if account:
+            return store.account_portfolio(account) == portfolio
+        customer = record.data.get("customer_id")
+        return not customer or portfolio in store.customer_portfolios(customer)
+
+    return [r for r in records if allowed(r)]
+
+
+def scoped(item, portfolio: str):
+    records = visible_records(item.supporting_records, portfolio)
+    return item.model_copy(update={"supporting_records": records})
 
 
 def require_portfolio(account_id: str, scope: AnalystScope, target: str) -> None:
@@ -116,7 +134,7 @@ def me(scope: AnalystScope = Depends(current_scope)):
 
 
 @app.get("/users")
-def users():
+def users(scope: AnalystScope = Depends(current_scope)):
     return store.users()
 
 
@@ -192,8 +210,9 @@ def stats(scope: AnalystScope = Depends(current_scope)):
     return store.stats(scope.portfolio)
 
 @app.get("/graph")
-def graph(scope: AnalystScope = Depends(current_scope)):
-    return store.relationship_graph(scope.portfolio)
+def graph(account_id: str, scope: AnalystScope = Depends(current_scope)):
+    require_portfolio(account_id, scope, account_id)
+    return store.relationship_graph(account_id, scope.portfolio)
 
 
 @app.get("/alerts", response_model=list[Alert])
@@ -220,12 +239,12 @@ def alerts(
                  or detection_type in {h.rule for h in a.rule_hits})
         )
 
-    return [a for a in store.alerts(scope.portfolio) if keep(a)]
+    return [scoped(a, scope.portfolio) for a in store.alerts(scope.portfolio) if keep(a)]
 
 
 @app.get("/cases", response_model=list[Case])
 def cases(scope: AnalystScope = Depends(current_scope)):
-    return store.cases(scope.portfolio)
+    return [scoped(c, scope.portfolio) for c in store.cases(scope.portfolio)]
 
 
 @app.get("/cases/{case_id}", response_model=CaseDetail)
@@ -233,6 +252,8 @@ def case_detail(case_id: str, scope: AnalystScope = Depends(current_scope)):
     owned_case(case_id, scope)
     detail = store.case_detail(case_id)
     detail.replay_available = replays.replay_file(detail.alert.transaction_id) is not None
+    detail.case = scoped(detail.case, scope.portfolio)
+    detail.alert = scoped(detail.alert, scope.portfolio)
     return detail
 
 
@@ -248,7 +269,7 @@ def decide(case_id: str, body: DecisionRequest, scope: AnalystScope = Depends(cu
     )
     store.audit("decision_recorded", analyst_id=scope.analyst_id, case_id=case_id,
                 decision=body.decision, note=body.note)
-    return store.get_case(case_id)
+    return scoped(store.get_case(case_id), scope.portfolio)
 
 
 @app.post("/cases/{case_id}/investigation", response_model=InvestigationStarted, status_code=202)
@@ -262,8 +283,13 @@ def investigate(
     replay = bool(body and body.replay)
     existing = store.get_investigation(case.investigation_id) if case.investigation_id else None
     if not replay:
-        if existing:
+        failed = existing and existing.report and existing.report.assessment is None
+        if existing and not failed:
             return InvestigationStarted(investigation_id=existing.id)
+        if failed:
+            store.remove_investigation(existing.id)
+            store.audit("investigation_replaced", analyst_id=scope.analyst_id, case_id=case_id,
+                        replaced=existing.id)
         investigation_id = store.start_investigation(case_id)
         background.add_task(run_investigation, investigation_id, scope, store)
         return InvestigationStarted(investigation_id=investigation_id)
@@ -320,13 +346,22 @@ def evals_latest():
     return json.loads(RESULTS.read_text())
 
 
+def write_atomic(path: Path, text: str) -> None:
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(text)
+    temporary.replace(path)
+
+
 def eval_running() -> bool:
     return subprocess.run(["pgrep", "-f", "evals[.]run"], capture_output=True).returncode == 0
 
 
 @app.get("/evals/status")
 def evals_status():
-    progress = json.loads(PROGRESS.read_text()) if PROGRESS.exists() else {}
+    try:
+        progress = json.loads(PROGRESS.read_text())
+    except (OSError, ValueError):
+        progress = {}  # absent, or caught mid-write
     return {
         "running": eval_running(),
         "done": progress.get("done", 0),
@@ -342,7 +377,7 @@ def evals_run(scope: AnalystScope = Depends(current_scope)):
     if eval_running():
         raise HTTPException(409, "An eval run is already in progress.")
     PROGRESS.parent.mkdir(exist_ok=True)
-    PROGRESS.write_text(json.dumps({"done": 0, "total": 0, "current": "starting"}))
+    write_atomic(PROGRESS, json.dumps({"done": 0, "total": 0, "current": "starting"}))
     subprocess.Popen(
         [sys.executable, "-m", "evals.run"],
         cwd=APP_DIR,

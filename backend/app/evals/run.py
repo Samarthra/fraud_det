@@ -50,9 +50,11 @@ Investigate = Callable[[str, AnalystScope, AgentStore], None]
 
 def write_progress(done: int, total: int, current: str, last_error: str | None = None) -> None:
     PROGRESS.parent.mkdir(exist_ok=True)
-    PROGRESS.write_text(
+    temporary = PROGRESS.with_suffix(".tmp")  # a reader never sees half a file
+    temporary.write_text(
         json.dumps({"done": done, "total": total, "current": current, "last_error": last_error})
     )
+    temporary.replace(PROGRESS)
 
 
 def run_case(

@@ -5,6 +5,7 @@ import sqlite3
 import threading
 from collections import defaultdict
 from datetime import datetime, timedelta
+from hmac import compare_digest
 from statistics import median
 from typing import Any, Sequence
 from uuid import uuid4
@@ -33,9 +34,8 @@ USER_CREDENTIALS = [
     {"username": "user1", "password": "password", "analyst_id": "analyst-1"},
     {"username": "user2", "password": "password", "analyst_id": "analyst-2"},
 ]
-COMMON_PASSWORDS = {"password", "demo", "123456", "secret"}
 
-
+MAX_LINKED_ACCOUNTS = 12
 FINAL_DECISIONS = {"false_positive", "confirmed_fraud", "escalated"}
 
 SCHEMA = """
@@ -143,8 +143,8 @@ class Store:
 
     def authenticate(self, username: str, password: str) -> str | None:
         for u in USER_CREDENTIALS:
-            if u["username"] == username and (u["password"] == password or password in COMMON_PASSWORDS
-                                              or password == username):
+            same_user = compare_digest(u["username"].encode(), username.encode())
+            if same_user and compare_digest(u["password"].encode(), password.encode()):
                 return u["analyst_id"]
         return None
 
@@ -209,49 +209,54 @@ class Store:
         }
 
     # Query helpers used by tools
-    def relationship_graph(self, portfolio: str) -> dict[str, Any]:
-        accounts = [r["account_id"] for r in self._all(
-            "SELECT account_id FROM accounts WHERE portfolio=?", portfolio)]
-        account_set = set(accounts)
-        nodes: dict[str, dict[str, Any]] = {}
-        edges: list[dict[str, str]] = []
-        edge_keys: set[tuple[str, str, str]] = set()
-        def node(nid, ntype, label=None):
-            if nid not in nodes:
-                nodes[nid] = {"id": nid, "type": ntype, "label": label or nid}
-        for aid in accounts:
-            node(aid, "account")
-        for r in self._all(
-            "SELECT account_id, device_id, beneficiary_id FROM transactions"):
-            aid = r["account_id"]
-            if aid not in account_set:
-                continue
-            if r["device_id"]:
-                did = r["device_id"]
-                node(did, "device")
-                key = (aid, did, "device")
-                if key not in edge_keys:
-                    edge_keys.add(key)
-                    edges.append({"source": aid, "target": did, "label": "uses"})
-            if r["beneficiary_id"]:
-                bid = r["beneficiary_id"]
-                node(bid, "beneficiary")
-                key = (aid, bid, "beneficiary")
-                if key not in edge_keys:
-                    edge_keys.add(key)
-                    edges.append({"source": aid, "target": bid, "label": "pays"})
-        for r in self._all("SELECT account_id, device_id FROM logins"):
-            aid = r["account_id"]
-            if aid not in account_set:
-                continue
-            if r["device_id"]:
-                did = r["device_id"]
-                node(did, "device")
-                key = (aid, did, "device")
-                if key not in edge_keys:
-                    edge_keys.add(key)
-                    edges.append({"source": aid, "target": did, "label": "login"})
-        return {"nodes": list(nodes.values()), "edges": edges}
+    def relationship_graph(self, account_id: str, portfolio: str) -> dict[str, Any]:
+        """One account's devices and beneficiaries, and who else in the Portfolio shares them."""
+        payments = self._all(
+            "SELECT DISTINCT beneficiary_id, beneficiary_name FROM transactions WHERE account_id=?",
+            account_id,
+        )
+        devices = self._all(
+            "SELECT device_id FROM transactions WHERE account_id=? AND device_id IS NOT NULL "
+            "UNION SELECT device_id FROM logins WHERE account_id=?",
+            account_id,
+            account_id,
+        )
+        nodes = [{"id": account_id, "type": "account", "label": account_id}]
+        edges = []
+        hubs: dict[str, str] = {}
+        for row in devices:
+            hubs[row["device_id"]] = "device"
+            nodes.append({"id": row["device_id"], "type": "device", "label": row["device_id"]})
+            edges.append({"source": account_id, "target": row["device_id"], "label": "uses"})
+        for row in payments:
+            hubs[row["beneficiary_id"]] = "beneficiary"
+            nodes.append({"id": row["beneficiary_id"], "type": "beneficiary", "label": row["beneficiary_name"]})
+            edges.append({"source": account_id, "target": row["beneficiary_id"], "label": "pays"})
+
+        shared: dict[str, set[str]] = {}
+        for hub, kind in hubs.items():
+            column = "device_id" if kind == "device" else "beneficiary_id"
+            for row in self._all(f"SELECT DISTINCT account_id FROM transactions WHERE {column}=?", hub):
+                shared.setdefault(row["account_id"], set()).add(hub)
+            if kind == "device":
+                for row in self._all("SELECT DISTINCT account_id FROM logins WHERE device_id=?", hub):
+                    shared.setdefault(row["account_id"], set()).add(hub)
+        shared.pop(account_id, None)
+
+        visible = sorted(a for a in shared if self.account_portfolio(a) == portfolio)
+        for other in visible[:MAX_LINKED_ACCOUNTS]:
+            nodes.append({"id": other, "type": "account", "label": other})
+            edges += [{"source": other, "target": hub, "label": "shares"} for hub in sorted(shared[other])]
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "more_in_portfolio": max(0, len(visible) - MAX_LINKED_ACCOUNTS),
+            "out_of_scope_count": len(shared) - len(visible),
+        }
+
+    def customer_portfolios(self, customer_id: str) -> set[str]:
+        rows = self._all("SELECT portfolio FROM accounts WHERE customer_id=?", customer_id)
+        return {r["portfolio"] for r in rows}
 
     def account_portfolio(self, account_id: str) -> str | None:
         row = self._one("SELECT portfolio FROM accounts WHERE account_id=?", account_id)
@@ -656,6 +661,10 @@ class Store:
             "SELECT body FROM follow_ups WHERE investigation_id=? ORDER BY rowid", investigation_id
         )
         return [FollowUp.model_validate_json(r["body"]) for r in rows]
+
+    def pending_follow_ups(self) -> list[str]:
+        rows = self._all("SELECT id, body FROM follow_ups")
+        return [r["id"] for r in rows if FollowUp.model_validate_json(r["body"]).answer is None]
 
     def save_followup_answer(
         self, follow_up_id: str, answer: str, evidence_ids: Sequence[str], verification: str

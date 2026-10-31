@@ -1,3 +1,4 @@
+import base64
 import io
 
 import pytest
@@ -11,8 +12,12 @@ from demo.sample_files import bad_rows_csv
 from demo.seed import load_sample
 from store import Store
 
-ONE = {"X-Analyst-Id": "analyst-1"}
-TWO = {"X-Analyst-Id": "analyst-2"}
+def basic(user, password="password"):
+    return {"Authorization": "Basic " + base64.b64encode(f"{user}:{password}".encode()).decode()}
+
+
+ONE = basic("analyst-1")
+TWO = basic("analyst-2")
 
 
 def fake_run(investigation_id, scope, store):
@@ -276,12 +281,69 @@ def test_reset_needs_an_analyst_and_keeps_the_audit_trail(client):
     assert "decision_recorded" in events and "demo_reset" in events
 
 
-def test_graph_needs_an_analyst_and_stays_in_the_portfolio(client):
-    assert client.get("/graph").status_code == 401
-    one = client.get("/graph", headers=ONE).json()
-    accounts = {n["id"] for n in one["nodes"] if n["type"] == "account"}
-    assert accounts and all(main.store.account_portfolio(a) == "portfolio-1" for a in accounts)
-    ids = {n["id"] for n in one["nodes"]}
-    assert all(e["source"] in ids and e["target"] in ids for e in one["edges"])
-    other = {n["id"] for n in client.get("/graph", headers=TWO).json()["nodes"] if n["type"] == "account"}
-    assert not accounts & other
+def test_graph_shows_one_account_and_counts_other_portfolios(client):
+    assert client.get("/graph", params={"account_id": "ACC-10042"}).status_code == 401
+    assert client.get("/graph", params={"account_id": "ACC-10042"}, headers=TWO).status_code == 403
+    body = client.get("/graph", params={"account_id": "ACC-10042"}, headers=ONE)
+    graph = body.json()
+    ids = {n["id"] for n in graph["nodes"]}
+    assert {"ACC-10042", "DEV-9001", "BEN-7001", "ACC-10311"} <= ids
+    assert graph["out_of_scope_count"] == 3 and "ACC-60001" not in body.text
+    assert all(e["source"] in ids and e["target"] in ids for e in graph["edges"])
+    assert len(graph["nodes"]) < 40
+
+
+def test_only_real_credentials_get_in(client):
+    assert client.get("/stats", headers={"X-Analyst-Id": "analyst-1"}).status_code == 401
+    for user, password in [("analyst-1", "demo"), ("analyst-1", "123456"), ("user1", "user1"), ("analyst-1", "wrong")]:
+        assert client.get("/stats", headers=basic(user, password)).status_code == 401
+    assert client.get("/users").status_code == 401
+    assert client.get("/stats", headers=ONE).status_code == 200
+
+
+def test_shared_device_records_from_another_portfolio_are_hidden(client):
+    from contracts import Alert, RuleHit, SupportingRecord
+    alert = Alert(id="ALT-X", case_id="CASE-X", category="shared_device", product="core_banking",
+                  risk_level="high", score=80, rule_hits=[RuleHit(rule="shared_device", points=55, reason="r")],
+                  customer_id="CUS-10420", account_id="ACC-10042",
+                  supporting_records=[
+                      SupportingRecord(kind="account", source_ref="ACC-10042", data={"account_id": "ACC-10042"}),
+                      SupportingRecord(kind="account", source_ref="ACC-60001", data={"account_id": "ACC-60001", "name": "Secret"}),
+                  ], created_at="2026-10-31T10:00:00+05:30")
+    main.store.add_alert("x", alert)
+    main.store.add_case(alert)
+    rows = [client.get("/cases/CASE-X", headers=ONE).text,
+            client.get("/alerts", params={"detection_type": "shared_device"}, headers=ONE).text,
+            client.get("/cases", headers=ONE).text]
+    for text in rows:
+        assert "Secret" not in text and "ACC-60001" not in text
+    assert "ACC-10042" in rows[0]
+
+
+def test_a_failed_investigation_can_be_restarted(client):
+    case_id = takeover(client)["case_id"]
+    first = client.post(f"/cases/{case_id}/investigation", headers=ONE).json()["investigation_id"]
+    main.store.save_report(first, empty_report("Sarvam returned 402"))
+    second = client.post(f"/cases/{case_id}/investigation", headers=ONE).json()["investigation_id"]
+    assert second != first
+    assert client.get(f"/investigations/{second}", headers=ONE).json()["report"]["assessment"] == "suspicious"
+    assert "investigation_replaced" in [e["event"] for e in client.get("/audit", headers=ONE).json()]
+
+
+def test_interrupted_follow_ups_close_on_startup(client):
+    case_id = takeover(client)["case_id"]
+    inv = client.post(f"/cases/{case_id}/investigation", headers=ONE).json()["investigation_id"]
+    main.store.add_follow_up(inv, "Stuck?")
+    with TestClient(main.app):
+        pass
+    body = client.get(f"/investigations/{inv}", headers=ONE).json()
+    assert body["follow_ups"][0]["verification"] == "unverified" and "interrupted" in body["follow_ups"][0]["answer"]
+
+
+def test_half_written_eval_progress_is_not_an_error(client, monkeypatch):
+    progress = main.RESULTS.with_name("progress.json")
+    monkeypatch.setattr(main, "PROGRESS", progress)
+    monkeypatch.setattr(main, "eval_running", lambda: True)
+    progress.write_text('{"done": 3, "to')
+    res = client.get("/evals/status")
+    assert res.status_code == 200 and res.json()["running"] is True
