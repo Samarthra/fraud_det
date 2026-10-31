@@ -10,6 +10,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, UploadFile
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 
@@ -63,8 +64,17 @@ app.add_middleware(
 )
 
 
-def current_scope(x_analyst_id: str | None = Header(default=None)) -> AnalystScope:
-    analyst = store.analyst(x_analyst_id)
+security = HTTPBasic(auto_error=False)
+
+
+def current_scope(credentials: HTTPBasicCredentials | None = Depends(security),
+                  x_analyst_id: str | None = Header(default=None)) -> AnalystScope:
+    analyst_id = x_analyst_id
+    if credentials is not None:
+        analyst_id = store.authenticate(credentials.username, credentials.password)
+        if analyst_id is None:
+            raise HTTPException(401, "Invalid credentials.")
+    analyst = store.analyst(analyst_id)
     if analyst is None:
         raise HTTPException(401, "Pick an Analyst first.")
     return AnalystScope(analyst_id=analyst.id, portfolio=analyst.portfolio)
@@ -95,6 +105,11 @@ def owned_investigation(investigation_id: str, scope: AnalystScope) -> Investiga
 @app.get("/analysts", response_model=list[Analyst])
 def analysts():
     return store.analysts()
+
+
+@app.get("/users")
+def users():
+    return store.users()
 
 
 @app.post("/ingest/{dataset}", response_model=UploadResult)

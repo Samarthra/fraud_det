@@ -97,6 +97,11 @@ let analyst = currentAnalyst()
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { 'X-Analyst-Id': analyst }
+  try {
+    headers['Authorization'] = `Basic ${btoa(`${analyst}:password`)}`
+  } catch {
+    // ignore
+  }
   if (init.body && !(init.body instanceof FormData)) headers['Content-Type'] = 'application/json'
   const response = await fetch(`/api${path}`, { ...init, headers })
   if (!response.ok) {

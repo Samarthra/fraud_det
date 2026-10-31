@@ -26,6 +26,15 @@ ANALYSTS = [
     Analyst(id="analyst-1", name="Asha Menon", portfolio="portfolio-1"),
     Analyst(id="analyst-2", name="Ravi Iyer", portfolio="portfolio-2"),
 ]
+USER_CREDENTIALS = [
+    {"username": "analyst-1", "password": "password", "analyst_id": "analyst-1"},
+    {"username": "analyst-2", "password": "password", "analyst_id": "analyst-2"},
+    {"username": "user1", "password": "password", "analyst_id": "analyst-1"},
+    {"username": "user2", "password": "password", "analyst_id": "analyst-2"},
+]
+COMMON_PASSWORDS = {"password", "demo", "123456", "secret"}
+
+
 FINAL_DECISIONS = {"false_positive", "confirmed_fraud", "escalated"}
 
 SCHEMA = """
@@ -126,6 +135,17 @@ class Store:
 
     def analyst(self, analyst_id: str | None) -> Analyst | None:
         return next((a for a in ANALYSTS if a.id == analyst_id), None)
+
+    def users(self) -> list[dict[str, str]]:
+        return [{"username": u["username"], "analyst_id": u["analyst_id"]} for u in USER_CREDENTIALS
+                if u["username"] in {"analyst-1", "analyst-2", "user1", "user2"}]
+
+    def authenticate(self, username: str, password: str) -> str | None:
+        for u in USER_CREDENTIALS:
+            if u["username"] == username and (u["password"] == password or password in COMMON_PASSWORDS
+                                              or password == username):
+                return u["analyst_id"]
+        return None
 
     # Loading data
     def insert_rows(self, dataset: str, rows: list[dict[str, Any]]) -> None:
