@@ -147,6 +147,7 @@ export default function Dashboard() {
               <li key={h.rule} className="flex justify-between gap-4"><span>{h.reason}</span><span className="tabular-nums text-slate-500">+{h.points}</span></li>
             ))}
           </ul>
+          <p className="mt-2"><a className="text-xs text-blue-700 underline" href="#/rules">How rules work</a></p>
           <h3 className="mt-3 text-xs font-semibold text-slate-500">Supporting records</h3>
           {selected.supporting_records.map((r) => (
             <details key={r.source_ref} className="mt-1 text-sm">

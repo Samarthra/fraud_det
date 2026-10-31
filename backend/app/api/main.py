@@ -38,7 +38,7 @@ from contracts import (  # noqa: E402
 from demo import replay as replays  # noqa: E402
 from demo.sample_files import bad_rows_csv  # noqa: E402
 from demo.seed import load_sample  # noqa: E402
-from detection.engine import run_detection  # noqa: E402
+from detection.engine import load_config, run_detection  # noqa: E402
 from ingest import DATASETS, FileRejected, check_file, template_csv  # noqa: E402
 from store import Store, now  # noqa: E402
 
@@ -203,6 +203,12 @@ def rerun(scope: AnalystScope = Depends(current_scope)):
     created = run_detection(store)
     store.audit("detection_rerun", analyst_id=scope.analyst_id, alerts_created=created)
     return {"alerts_created": created}
+
+
+@app.get("/detection/rules")
+def detection_rules(scope: AnalystScope = Depends(current_scope)):
+    """Read fresh each time, so the page always matches rules.yaml."""
+    return load_config()
 
 
 @app.get("/stats", response_model=Stats)

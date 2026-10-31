@@ -15,6 +15,7 @@ import {
 import CasePage from './pages/CasePage'
 import Cases from './pages/Cases'
 import Dashboard from './pages/Dashboard'
+import DetectionRules from './pages/DetectionRules'
 import Evaluations from './pages/Evaluations'
 import Governance from './pages/Governance'
 import Upload from './pages/Upload'
@@ -26,6 +27,7 @@ const NAV = [
   ['dashboard', 'Dashboard'],
   ['cases', 'Case queue'],
   ['evaluations', 'Evaluations'],
+  ['rules', 'Detection rules'],
   ['governance', 'Governance'],
 ]
 
@@ -112,12 +114,13 @@ export default function App() {
             </div>
           </div>
         </header>
-        <main className="mx-auto max-w-6xl space-y-4 px-4 py-6" key={`${analyst}-${version}`}>
+        <main className={`mx-auto space-y-4 px-4 ${page === 'cases' && id ? 'max-w-[96rem] py-3' : 'max-w-6xl py-6'}`} key={`${analyst}-${version}`}>
           {page === 'upload' && <Upload />}
           {page === 'dashboard' && <Dashboard />}
           {page === 'cases' && !id && <Cases />}
           {page === 'cases' && id && <CasePage key={id} id={id} />}
           {page === 'evaluations' && <Evaluations />}
+        {page === 'rules' && <DetectionRules />}
           {page === 'governance' && <Governance />}
         </main>
       </div>

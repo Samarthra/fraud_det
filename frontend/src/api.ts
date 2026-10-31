@@ -83,6 +83,11 @@ export type GraphNodeDetail = {
   cases: { id: string; category: string; risk_level: string }[]
 }
 
+export type DetectionRules = {
+  thresholds: { record: number; actionable: number; high: number }
+  rules: Record<string, Record<string, number | string>>
+}
+
 export class ApiError extends Error {
   status: number
   constructor(status: number, message: string) {
@@ -173,6 +178,7 @@ export const api = {
   graph: (accountId: string) => request<Graph>(`/graph?account_id=${encodeURIComponent(accountId)}`),
   graphNode: (id: string, type: string) =>
     request<GraphNodeDetail>(`/graph/node?${new URLSearchParams({ id, type })}`),
+  detectionRules: () => request<DetectionRules>('/detection/rules'),
   alerts: (filters: Record<string, string>) => {
     const set = Object.entries(filters).filter(([, value]) => value)
     return request<Alert[]>(`/alerts?${new URLSearchParams(set)}`)
