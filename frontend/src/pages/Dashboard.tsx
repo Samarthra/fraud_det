@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, type Alert, type Graph, type Stats } from '../api'
+import { api, type Alert, type Stats } from '../api'
 import EntityGraph from '../components/EntityGraph'
 import { Button, Card, ErrorNote, Risk, Stat, inputClass, label, when } from '../ui'
 
@@ -19,7 +19,6 @@ export default function Dashboard() {
   const [rerun, setRerun] = useState<string | null>(null)
   const [runs, setRuns] = useState(0)
   const [page, setPage] = useState(1)
-  const [graph, setGraph] = useState<Graph | null>(null)
 
   useEffect(() => {
     api.stats().then(setStats).catch((e) => setError(e.message))
@@ -46,18 +45,6 @@ export default function Dashboard() {
   }, [selected])
 
   const focus = selected ?? alerts[0] ?? null
-  const focusAccount = focus?.account_id
-
-  useEffect(() => {
-    if (!focusAccount) return
-    let current = true
-    api.graph(focusAccount)
-      .then((g) => { if (current) setGraph(g) })
-      .catch(() => { if (current) setGraph(null) })
-    return () => {
-      current = false
-    }
-  }, [focusAccount, runs])
 
   const set = (key: keyof typeof EMPTY) => (e: { target: { value: string } }) =>
     setFilters((f) => ({ ...f, [key]: e.target.value }))
@@ -169,7 +156,7 @@ export default function Dashboard() {
           ))}
         </Card>
       )}
-      {graph && focus && <EntityGraph graph={graph} alert={focus} />}
+      {focus && <EntityGraph key={`${focus.id}-${runs}`} alert={focus} />}
       </div>
     </>
   )

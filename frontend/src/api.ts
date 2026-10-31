@@ -73,6 +73,16 @@ export type Graph = {
   out_of_scope_count: number
 }
 
+export type GraphNodeDetail = {
+  id: string
+  type: string
+  title: string
+  facts: { label: string; value: string }[]
+  accounts: string[]
+  out_of_scope_count: number
+  cases: { id: string; category: string; risk_level: string }[]
+}
+
 export class ApiError extends Error {
   status: number
   constructor(status: number, message: string) {
@@ -161,6 +171,8 @@ export const api = {
   },
   stats: () => request<Stats>('/stats'),
   graph: (accountId: string) => request<Graph>(`/graph?account_id=${encodeURIComponent(accountId)}`),
+  graphNode: (id: string, type: string) =>
+    request<GraphNodeDetail>(`/graph/node?${new URLSearchParams({ id, type })}`),
   alerts: (filters: Record<string, string>) => {
     const set = Object.entries(filters).filter(([, value]) => value)
     return request<Alert[]>(`/alerts?${new URLSearchParams(set)}`)

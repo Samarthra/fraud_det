@@ -215,6 +215,15 @@ def graph(account_id: str, scope: AnalystScope = Depends(current_scope)):
     return store.relationship_graph(account_id, scope.portfolio)
 
 
+@app.get("/graph/node")
+def graph_node(id: str, type: str, scope: AnalystScope = Depends(current_scope)):
+    detail = store.graph_node_detail(id, type, scope.portfolio)
+    if detail is None:
+        store.audit("access_denied", analyst_id=scope.analyst_id, target=id)
+        raise HTTPException(403, f"{id} is outside this Analyst's Portfolio.")
+    return detail
+
+
 @app.get("/alerts", response_model=list[Alert])
 def alerts(
     customer: str | None = None,

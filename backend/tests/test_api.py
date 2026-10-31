@@ -293,6 +293,31 @@ def test_graph_shows_one_account_and_counts_other_portfolios(client):
     assert len(graph["nodes"]) < 40
 
 
+def node(client, id, type, headers=ONE):
+    return client.get("/graph/node", params={"id": id, "type": type}, headers=headers)
+
+
+def test_graph_node_details_show_only_the_portfolio(client):
+    account = node(client, "ACC-10042", "account").json()
+    assert account["facts"] and any(c["id"] for c in account["cases"])
+
+    beneficiary = node(client, "BEN-7001", "beneficiary")
+    assert "ACC-60001" not in beneficiary.text and beneficiary.json()["out_of_scope_count"] == 3
+    assert "ACC-10311" in beneficiary.json()["accounts"]
+    assert node(client, "DEV-9001", "device").json()["accounts"] == ["ACC-10042"]
+
+
+def test_graph_node_details_deny_other_portfolios_and_are_audited(client):
+    assert client.get("/graph/node", params={"id": "ACC-10042", "type": "account"}).status_code == 401
+    assert node(client, "ACC-10042", "account", TWO).status_code == 403
+    assert node(client, "DEV-9001", "device", TWO).status_code == 403
+    assert node(client, "BEN-7002", "beneficiary", TWO).status_code == 403
+    assert node(client, "ACC-10042", "nonsense").status_code == 403
+    assert node(client, "ACC-404", "account").status_code == 403
+    denied = [e for e in client.get("/audit", headers=TWO).json() if e["event"] == "access_denied"]
+    assert len(denied) == 3
+
+
 def test_only_real_credentials_get_in(client):
     assert client.get("/stats", headers={"X-Analyst-Id": "analyst-1"}).status_code == 401
     for user, password in [("analyst-1", "demo"), ("analyst-1", "123456"), ("user1", "user1"), ("analyst-1", "wrong")]:

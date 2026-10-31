@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, api, type CaseDetail, type DecisionValue, type Evidence, type Investigation, type Step } from '../api'
+import EntityGraph from '../components/EntityGraph'
 import { Badge, Button, Card, ErrorNote, Risk, inputClass, label, when } from '../ui'
 
 const REVEAL_MS = 700
@@ -228,6 +229,8 @@ export default function CasePage({ id }: { id: string }) {
               {investigation.evidence.map((e) => <EvidenceRow key={e.id} evidence={e} open={openEvidence === e.id} />)}
             </Card>
           )}
+
+          <EntityGraph key={alert.id} alert={alert} />
 
           {report && investigation && !replay && (
             <Card title="Follow-ups">

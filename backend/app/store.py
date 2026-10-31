@@ -254,6 +254,64 @@ class Store:
             "out_of_scope_count": len(shared) - len(visible),
         }
 
+    def graph_node_detail(self, node_id: str, kind: str, portfolio: str) -> dict[str, Any] | None:
+        """Facts for one graph node. Returns None when the Analyst may not see it."""
+        if kind == "account":
+            account = self.get_account(node_id)
+            if account is None or self.account_portfolio(node_id) != portfolio:
+                return None
+            alerts = [a for a in self.alerts(portfolio) if a.account_id == node_id]
+            return {
+                "id": node_id,
+                "type": kind,
+                "title": account["name"],
+                "facts": [
+                    {"label": "Customer", "value": account["customer_id"]},
+                    {"label": "Onboarded", "value": account["onboarded_at"][:10]},
+                    {"label": "Median payment", "value": f"₹{account['median_outgoing_30d'] or 0:,.0f}"},
+                    {"label": "Alerts", "value": str(len(alerts))},
+                ],
+                "accounts": [],
+                "out_of_scope_count": 0,
+                "cases": [
+                    {"id": a.case_id, "category": a.category, "risk_level": a.risk_level}
+                    for a in alerts
+                    if a.case_id
+                ],
+            }
+
+        if kind == "device":
+            device = self.get_device(node_id)
+            accounts = device["accounts"] if device else []
+            facts = [{"label": "First seen", "value": device["first_seen"][:10]}] if device else []
+        elif kind == "beneficiary":
+            beneficiary = self.get_beneficiary(node_id)
+            if beneficiary is None or portfolio not in self.beneficiary_portfolios(node_id):
+                return None
+            rows = self._all(
+                "SELECT DISTINCT account_id FROM transactions WHERE beneficiary_id=?", node_id
+            )
+            accounts = sorted(r["account_id"] for r in rows)
+            facts = [
+                {"label": "Name", "value": beneficiary["name"]},
+                {"label": "First paid", "value": beneficiary["first_paid"][:10]},
+                {"label": "Payments", "value": str(beneficiary["payment_count"])},
+            ]
+        else:
+            return None
+        visible = [a for a in accounts if self.account_portfolio(a) == portfolio]
+        if not visible:
+            return None
+        return {
+            "id": node_id,
+            "type": kind,
+            "title": node_id,
+            "facts": facts,
+            "accounts": visible,
+            "out_of_scope_count": len(accounts) - len(visible),
+            "cases": [],
+        }
+
     def customer_portfolios(self, customer_id: str) -> set[str]:
         rows = self._all("SELECT portfolio FROM accounts WHERE customer_id=?", customer_id)
         return {r["portfolio"] for r in rows}
