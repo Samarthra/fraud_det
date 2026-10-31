@@ -6,6 +6,10 @@ FraudLens loads customer, transaction, login, loan and insurance data, flags sus
 
 All data is synthetic. This prototype demonstrates controls. It doesn't claim legal compliance or certification.
 
+[![Watch the 23-second FraudLens AI launch video](docs/assets/fraudlens-launch.jpg)](docs/assets/fraudlens-launch.mp4)
+
+**[Watch the 23-second video](docs/assets/fraudlens-launch.mp4)**, with sound.
+
 ## What it does
 
 - **Upload:** CSV, Excel or JSON, with every invalid row listed and its reason given.
