@@ -119,7 +119,7 @@ Evidence belongs to an Investigation. A Case's `supporting_records` come from it
 ```
 
 - One row per source record, snapshotted when a tool returns it.
-- IDs run per Investigation. The same source record reuses its Evidence ID within an Investigation.
+- IDs run per Investigation. The same `kind` and `source_ref` reuse their Evidence ID within an Investigation.
 - `relationship` Evidence is computed, and its `data` lists the source IDs it was derived from.
 - Each tool returns at most 10 rows.
 
@@ -171,7 +171,7 @@ The system adds `verification`: `verified | unverified`, plus `verification_erro
  summary, evidence_ids[], at}
 ```
 
-The UI polls every 500ms and reveals steps at a minimum of about 700ms each, because a full Investigation takes about 6s. The report appears only after the last step. The backend keeps its real speed.
+The UI polls every 500ms and reveals steps at a minimum of about 700ms each, so fast steps stay readable. A full Investigation took 12-28s in live checks, with one run at 70s. The report appears only after the last step. The backend keeps its real speed.
 
 ### REST
 
@@ -383,7 +383,7 @@ Person A runs `python -m evals.run` on a temporary copy of the database.
 | Prompt-injection cases | 3 payloads × 3 | 9 |
 | Out-of-scope access | Every tool and endpoint | 0 |
 
-That's an estimated ₹3 and 5 minutes per run. Prompt tuning happens only on the two scenarios, never on the held-out set.
+That's an estimated ₹10 and 20 minutes per run, from live checks at about ₹0.20 and 25s per Investigation. Prompt tuning happens only on the two scenarios, never on the held-out set.
 
 ### Scenario gates
 
@@ -408,10 +408,13 @@ Plain code tests with no LLM. Each tool and each scoped endpoint gets an out-of-
 
 ### Running it
 
-- Use a hosted Langfuse dataset and `run_experiment` with `max_concurrency=1`. The default of 50 would breach Sarvam's rate limit.
-- Each check is deterministic code against `ground_truth`, reported as a Langfuse score.
-- Write `evals/results/latest.json` from the result `run_experiment` returns. The screen never starts an eval.
-- Spend at most 15 minutes testing trace linking on one case, because an experiment case may split across two traces. The fallback is a plain loop calling `create_score` on the seeded trace ID.
+Person A runs `python -m evals.run` from `backend/app`. It works on a temporary copy of the database, so eval runs never touch demo data.
+
+- A plain sequential loop runs each case. `run_experiment` creates a separate empty trace for each case, so it isn't used.
+- Each check is deterministic code against `ground_truth`, reported with `create_score` on the Investigation's seeded trace.
+- It runs once, at about 14:15, and writes `evals/results/latest.json`, which `GET /evals/latest` serves. Results are not read back through the Langfuse API.
+- The screen never starts an eval.
+- Someone checks the Sarvam credit balance before the run.
 
 ### Evaluations screen
 
@@ -493,8 +496,8 @@ If 13:15 slips:
 - **The false-positive Assessment** is untested on the real records.
 - **Synthesis on larger Evidence packs** is untested. Its 17 of 17 result covers packs of at most 5 records.
 - **Sarvam credit** is unconfirmed, and there's no fallback provider.
-- **Eval cost and time** extrapolate from one test Investigation.
-- **Langfuse trace linking in experiments** is unconfirmed.
+- **Eval cost and time** extrapolate from ten live Investigations on test data.
+- **Investigation time** varied from 12s to 70s, and the 70s run is unexplained.
 - **Rule outcomes** are unknown until the generator runs.
 - **The Verification regex** has to match what the synthetic data and the model actually produce.
 - **Replay** hasn't been built, so test one end to end before the 14:15 eval run.

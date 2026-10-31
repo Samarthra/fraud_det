@@ -56,3 +56,12 @@ def test_free_text_is_fenced_and_cut_for_the_model_but_stored_intact():
     assert text.count("</untrusted_data>") == 1 and len(text) < 240
     assert store.evidence[0].data["description"] == long
     assert wrap_untrusted({"amount": 5}) == {"amount": 5}
+
+
+def test_beneficiary_and_relationship_records_stay_separate():
+    store = FakeStore()
+    t = tools(store)
+    t["get_beneficiary"].invoke({"beneficiary_id": "BEN-7001"})
+    out = json.loads(t["analyze_relationships"].invoke({"beneficiary_id": "BEN-7001"}))
+    assert out[0]["kind"] == "relationship"
+    assert [e.kind for e in store.evidence] == ["beneficiary", "relationship"]

@@ -105,7 +105,7 @@ class FakeStore:
 
     def add_evidence(self, investigation_id, kind, source_ref, data, tool_call_id=None):
         for e in self.evidence:
-            if e.source_ref == source_ref:
+            if e.kind == kind and e.source_ref == source_ref:
                 return e
         row = Evidence(id=f"EV-{len(self.evidence) + 1}", investigation_id=investigation_id, kind=kind,
                        source_ref=source_ref, data=data, tool_call_id=tool_call_id,

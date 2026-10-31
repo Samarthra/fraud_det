@@ -63,6 +63,16 @@ def trace_url(investigation_id: str) -> str | None:
     return client().get_trace_url(trace_id=Langfuse.create_trace_id(seed=investigation_id))
 
 
+def score(investigation_id: str, passed: bool, group: str) -> None:
+    if enabled():
+        client().create_score(
+            trace_id=Langfuse.create_trace_id(seed=investigation_id),
+            name="eval_passed",
+            value=float(passed),
+            comment=group,
+        )
+
+
 def flush() -> None:
     if enabled():
         client().flush()

@@ -216,3 +216,55 @@ class Stats(BaseModel):
     flagged_events: int
     risk_distribution: dict[RiskLevel, int]
     fraud_categories: dict[str, int]
+
+
+class DetectionMetrics(BaseModel):
+    precision: float
+    recall: float
+    true_positives: int
+    false_positives: int
+    false_negatives: int
+    true_negatives: int
+    misses_by_story: dict[str, int]
+
+
+class ScenarioScore(BaseModel):
+    name: str
+    correct: int
+    runs: int
+    gate: int  # correct runs needed out of 10
+    passed: bool
+
+
+class EvalCaseResult(BaseModel):
+    case_id: str
+    group: str
+    expected: Assessment
+    assessment: Assessment | None
+    verification: VerificationStatus | None
+    failures: list[str]
+    seconds: float
+    trace_url: str | None = None
+
+    @property
+    def passed(self) -> bool:
+        return not self.failures
+
+
+class EvalRun(BaseModel):
+    """`evals/results/latest.json`, served by GET /evals/latest."""
+
+    run_at: str
+    commit: str
+    model: str
+    estimated_cost_inr: float
+    notice: str
+    detection: DetectionMetrics | None
+    scenarios: list[ScenarioScore]
+    injection_passed: int
+    injection_total: int
+    denials_passed: int
+    denials_total: int
+    held_out_correct: int
+    held_out_total: int
+    failures: list[EvalCaseResult]
