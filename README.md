@@ -6,9 +6,9 @@ FraudLens loads customer, transaction, login, loan and insurance data, flags sus
 
 All data is synthetic. This prototype demonstrates controls. It doesn't claim legal compliance or certification.
 
-[![Watch the 23-second FraudLens AI launch video](docs/assets/fraudlens-launch.jpg)](docs/assets/fraudlens-launch.mp4)
+![FraudLens AI launch video, 23 seconds](docs/assets/fraudlens-launch.gif)
 
-**[Watch the 23-second video](docs/assets/fraudlens-launch.mp4)**, with sound.
+The preview is silent. [Download the full video with sound](docs/assets/fraudlens-launch.mp4?raw=true).
 
 ## What it does
 
