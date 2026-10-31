@@ -1,0 +1,45 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>PROTOTYPE: Typology proofs on real records</title>
+<style>
+body{font:15px/1.5 system-ui,sans-serif;color:#0f172a;background:#f8fafc;margin:0}main{max-width:1060px;margin:auto;padding:24px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:15px;margin:0 0 8px}.card{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:14px 0}
+.q{color:#475569}button{font:inherit;border:1px solid #cbd5e1;background:#fff;border-radius:6px;padding:5px 10px;cursor:pointer;margin:2px}button.on{background:#1d4ed8;color:#fff;border-color:#1d4ed8}
+select{font:inherit;padding:5px;max-width:100%}table{border-collapse:collapse;width:100%;font-size:14px}td,th{border-top:1px solid #e2e8f0;padding:5px 8px;text-align:left}th{color:#64748b;font-weight:500}
+.r{font-weight:600;border-radius:5px;padding:3px 9px}.suspicious{background:#fee2e2;color:#991b1b}.not_suspicious{background:#d1fae5;color:#065f46}.none{background:#e2e8f0;color:#334155}
+.p{border-left:3px solid #1d4ed8;padding:2px 10px;margin:8px 0}.p.l{border-color:#059669}.m{color:#64748b;font-size:13px}.bad{color:#b91c1c;font-weight:600}.good{color:#047857;font-weight:600}.flag{background:#fef3c7;color:#92400e;padding:8px;border-radius:6px;margin:8px 0}
+</style><main>
+<h1>Do Typology proofs hold up on real records?</h1>
+<p class="q"><strong>Throwaway prototype.</strong> It runs the six Typologies over the real seeded FraudLens records, using plain rule code rather than an LLM. The text fact is simulated by looking for "passed OTP". The question: are the proofs correct and readable, and do look-alikes stay unproved? The 19 held-out Alerts are removed.</p>
+<div class="card"><h2>Guided walkthroughs</h2><div id="tabs"></div><p id="desc"></p><div id="steps"></div></div>
+<div class="card"><h2>Current Case</h2><select id="pick"></select><div id="state"></div></div>
+<div class="card"><h2>Try it yourself</h2><p class="m">Switch a record off to see what the proof loses, or plant forged text and see whether it gets through.</p><div id="free"></div></div>
+<div class="card"><h2>All stories</h2><p class="m">What each Alert would require from the agent. Red marks a wrong direction.</p><div id="sweep"></div></div>
+</main>
+<script>/*LOGIC*/</script><script>const WORLD=/*WORLD*/;</script><script>
+const A=WORLD.accounts;let cur=null,off=new Set(),extra=[],tab=0,changed='';
+const LAB={suspicious:'Must be suspicious',not_suspicious:'Must be not suspicious',none:'No requirement, the agent decides'};
+const E=(id)=>document.getElementById(id);
+const caseFor=t=>WORLD.cases.find(c=>c.alerts.some(a=>a.txn===t));
+const accs=()=>[...new Set(cur.alerts.map(a=>a.acc))];
+function records(){const o=[];for(const id of accs()){const a=A[id];if(!a)continue;for(const e of a.events)o.push([e.id,e.ty.replace(/_/g,' ')+': '+(e.details||'')]);a.logins.filter(l=>l.o==='failure').slice(0,5).forEach(l=>o.push([l.id,'failed login from '+l.d]));a.pays.forEach(p=>o.push([p.id,'payment ₹'+p.amt+' to '+p.b]));a.payouts.forEach(p=>o.push([p.id,'loan payout ₹'+p.amt]))}return o.slice(0,24)}
+function render(){const r=judge(cur.alerts,A,WORLD,{off,extra,scope:cur.portfolio});
+let h=`<p><span class="r ${r.required}">${LAB[r.required]}</span> ${changed?`<span class="m">${changed}</span>`:''}</p><p class="m">${cur.id}, ${cur.alerts.length} Alert(s), accounts ${accs().join(', ')}</p><h2>Proved</h2>`;
+const uniq=[...new Map(r.proved.map(p=>[p.id+p.subject+p.account,p])).values()];
+h+=uniq.length?uniq.map(p=>`<div class="p ${FRAUD.has(p.id)?'':'l'}"><strong>${NAMES[p.id]}</strong> on ${p.account}${p.textDependent?' <span class="m">(its ID comes from free text)</span>':''}<ul>${p.proof.map(([t,ref])=>`<li>${t} <span class="m">[${ref}]</span></li>`).join('')}</ul></div>`).join(''):'<p class="m">No Typology proved.</p>';
+const near=[...new Set(r.near.map(n=>`${NAMES[n.id]}: ${n.missing}`))];if(near.length)h+=`<h2>Nearly proved</h2><ul>${near.map(n=>`<li>${n}</li>`).join('')}</ul>`;
+if(r.uncovered.length&&!r.proved.some(p=>FRAUD.has(p.id)))h+=`<h2>Not explained</h2><ul>${r.uncovered.slice(0,8).map(n=>`<li>${n}</li>`).join('')}</ul>`;
+E('state').innerHTML=h;
+E('free').innerHTML=accs().map(id=>`<button onclick="forge('${id}')">Plant a forged "passed OTP" on ${id}</button>`).join('')+'<div>'+records().map(([id,t])=>`<button class="${off.has(id)?'on':''}" onclick="flip('${id}')" title="${t.replace(/"/g,'')}">${off.has(id)?'Restore':'Remove'} ${id}</button><span class="m">${t.slice(0,46)}</span><br>`).join('')+'</div>'}
+function pick(c){cur=c;off=new Set();extra=[];changed='';E('pick').value=c.id;render()}
+function flip(id){off.has(id)?off.delete(id):off.add(id);changed=(off.has(id)?'Removed ':'Restored ')+id;render()}
+function forge(acc){const d=cur.alerts.find(a=>a.acc===acc&&a.d)?.d||'DEV-FORGED';extra.push({account:acc,device:d,quote:'passed OTP',forged:true});changed='Planted forged OTP text for '+d;render()}
+const WALK=[
+['Takeover',()=>caseFor('TXN-50001'),'Failed logins, a new device and a payment to a first-time beneficiary. Mule payment should also prove. Watch the requirement stay suspicious when evidence goes.',[['Remove the payment','pay'],['Plant a forged OTP','forge']]],
+['False positive',()=>caseFor('TXN-50002'),'Both legitimate Typologies must prove together. Remove either one and the requirement should fall to "no requirement", not flip to suspicious.',[['Remove the OTP event','ev:device_enrolled'],['Remove the beneficiary event','ev:beneficiary_added']]],
+['Loan diversion',()=>caseFor('TXN-50003'),'Six Alerts across three systems. Remove the payout and the proof should go, though the requirement drops only because no other fraud Typology proves here.',[['Remove the loan payout','payout'],['Remove the transfer','pay']]]];
+function runStep(s){if(s==='forge')return forge(accs()[0]);if(s==='pay')return flip(A[accs()[0]].pays.slice(-1)[0].id);if(s==='payout')return flip(A[accs()[0]].payouts[0].id);const ty=s.split(':')[1];for(const id of accs()){const e=A[id]?.events.find(x=>x.ty===ty);if(e)return flip(e.id)}}
+function walk(i){tab=i;const[n,c,d,steps]=WALK[i];E('tabs').innerHTML=WALK.map((w,j)=>`<button class="${j===i?'on':''}" onclick="walk(${j})">${w[0]}</button>`).join('');E('desc').textContent=d;E('steps').innerHTML=steps.map(([t,s],k)=>`<button onclick="runStep('${s}')">${k+1}. ${t}</button>`).join('')+'<button onclick="walk('+i+')">Start again</button>';pick(c())}
+E('pick').innerHTML=WORLD.cases.map(c=>`<option value="${c.id}">${c.id} ${c.cat.replace(/_/g,' ')} (${c.portfolio}, ${c.alerts.length} Alerts)</option>`).join('');E('pick').onchange=e=>pick(WORLD.cases.find(c=>c.id===e.target.value));
+const rows={};for(const s of WORLD.sweep){const r=judge([s.alert],A,WORLD,{scope:s.pf}).required,k=s.story;rows[k]=rows[k]||{f:s.fraud,n:0,suspicious:0,not_suspicious:0,none:0};rows[k].n++;rows[k][r]++}
+E('sweep').innerHTML='<table><tr><th>Story</th><th>Truth</th><th>Alerts</th><th>Must be suspicious</th><th>Must be not suspicious</th><th>No requirement</th></tr>'+Object.entries(rows).sort((a,b)=>b[1].f-a[1].f).map(([k,v])=>`<tr><td>${k.replace(/_/g,' ')}</td><td>${v.f?'Fraud':'Benign'}</td><td>${v.n}</td><td class="${v.f?'':(v.suspicious?'bad':'')}">${v.suspicious}</td><td class="${v.f&&v.not_suspicious?'bad':''}">${v.not_suspicious}</td><td>${v.none}</td></tr>`).join('')+'</table>';
+walk(0);
+</script></html>
