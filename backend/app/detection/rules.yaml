@@ -1,0 +1,16 @@
+# Edit, then POST /detection/rerun. Existing Alerts and Cases stay untouched.
+thresholds:
+  record: 10       # recorded and classified
+  actionable: 50   # opens a Case
+  high: 75
+rules:
+  new_device: {points: 25, hours: 24}
+  amount_spike: {points: 25, multiplier: 5, window_days: 30, min_history: 3}
+  new_beneficiary: {points: 20}
+  mule_beneficiary: {points: 30, accounts: 5, window_days: 7}
+  velocity: {points: 15, payments: 3, minutes: 10}
+  foreign_ip: {points: 15, home_country: IN}
+  off_hours: {points: 10, start_hour: 0, end_hour: 5}
+  shared_device: {points: 55, family_points: 10, customers: 3, window_days: 30}
+  login_failures_then_success: {points: 30, failures: 3, within_minutes: 60, transfer_within_minutes: 120}
+  multi_applicant_device: {points: 50, customers: 2, window_days: 30}

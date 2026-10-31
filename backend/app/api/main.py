@@ -1,0 +1,289 @@
+"""Run from backend/app: uvicorn api.main:app --port 8010"""
+
+import json
+import os
+from collections.abc import Iterator
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from dotenv import load_dotenv
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
+
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+
+from agent.graph import answer_followup, empty_report, run_investigation  # noqa: E402
+from contracts import (  # noqa: E402
+    Alert,
+    Analyst,
+    AnalystScope,
+    Case,
+    CaseDetail,
+    Decision,
+    DecisionRequest,
+    FollowUp,
+    FollowUpRequest,
+    Investigation,
+    InvestigationStarted,
+    StartInvestigation,
+    Stats,
+    Step,
+    UploadResult,
+)
+from demo import replay as replays  # noqa: E402
+from demo.sample_files import bad_rows_csv  # noqa: E402
+from demo.seed import load_sample  # noqa: E402
+from detection.engine import run_detection  # noqa: E402
+from ingest import DATASETS, FileRejected, check_file, template_csv  # noqa: E402
+from store import Store, now  # noqa: E402
+
+DB_PATH = os.environ.get("FRAUDLENS_DB", str(Path(__file__).resolve().parents[2] / "fraudlens.db"))
+RESULTS = Path(__file__).resolve().parents[1] / "evals" / "results" / "latest.json"
+store = Store(DB_PATH)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> Iterator[None]:
+    for investigation_id in store.running_investigations():
+        store.save_report(investigation_id, empty_report("The Investigation was interrupted."))
+    yield
+
+
+app = FastAPI(title="FraudLens AI", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+def current_scope(x_analyst_id: str | None = Header(default=None)) -> AnalystScope:
+    analyst = store.analyst(x_analyst_id)
+    if analyst is None:
+        raise HTTPException(401, "Pick an Analyst first.")
+    return AnalystScope(analyst_id=analyst.id, portfolio=analyst.portfolio)
+
+
+def require_portfolio(account_id: str, scope: AnalystScope, target: str) -> None:
+    if store.account_portfolio(account_id) != scope.portfolio:
+        store.audit("access_denied", analyst_id=scope.analyst_id, target=target)
+        raise HTTPException(403, f"{target} is outside this Analyst's Portfolio.")
+
+
+def owned_case(case_id: str, scope: AnalystScope) -> Case:
+    case = store.get_case(case_id)
+    if case is None:
+        raise HTTPException(404, "Case not found.")
+    require_portfolio(case.account_id, scope, case_id)
+    return case
+
+
+def owned_investigation(investigation_id: str, scope: AnalystScope) -> Investigation:
+    investigation = store.get_investigation(investigation_id)
+    if investigation is None:
+        raise HTTPException(404, "Investigation not found.")
+    owned_case(investigation.case_id, scope)
+    return investigation
+
+
+@app.get("/analysts", response_model=list[Analyst])
+def analysts():
+    return store.analysts()
+
+
+@app.post("/ingest/{dataset}", response_model=UploadResult)
+async def ingest(dataset: str, file: UploadFile, scope: AnalystScope = Depends(current_scope)):
+    content = await file.read()
+    try:
+        rows, result = check_file(dataset, file.filename or "upload", content, store.known_ids())
+    except FileRejected as e:
+        store.audit("file_rejected", analyst_id=scope.analyst_id, filename=file.filename, reason=str(e))
+        raise HTTPException(422, str(e)) from e
+    store.insert_rows(dataset, rows)
+    result.alerts_created = run_detection(store)
+    store.audit("file_uploaded", analyst_id=scope.analyst_id, filename=file.filename,
+                dataset=dataset, loaded=result.loaded)
+    if result.rejected:
+        store.audit("rows_rejected", analyst_id=scope.analyst_id, filename=file.filename,
+                    rows=[r.row for r in result.rejected])
+    return result
+
+
+@app.get("/ingest/templates/{dataset}", response_class=PlainTextResponse)
+def template(dataset: str):
+    if dataset not in DATASETS:
+        raise HTTPException(404, "Unknown dataset.")
+    return PlainTextResponse(
+        template_csv(dataset),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={dataset}_template.csv"},
+    )
+
+
+@app.post("/demo/sample")
+def sample():
+    if store.known_ids()["account_id"]:
+        return {"alerts_created": 0, "already_loaded": True}
+    return {"alerts_created": load_sample(store), "already_loaded": False}
+
+
+@app.get("/demo/sample-file", response_class=PlainTextResponse)
+def sample_file():
+    return PlainTextResponse(
+        bad_rows_csv(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=sample_transactions_bad_rows.csv"},
+    )
+
+
+@app.post("/demo/reset")
+def reset():
+    store.reset()
+    return {"alerts_created": load_sample(store)}
+
+
+@app.post("/detection/rerun")
+def rerun(scope: AnalystScope = Depends(current_scope)):
+    created = run_detection(store)
+    store.audit("detection_rerun", analyst_id=scope.analyst_id, alerts_created=created)
+    return {"alerts_created": created}
+
+
+@app.get("/stats", response_model=Stats)
+def stats(scope: AnalystScope = Depends(current_scope)):
+    return store.stats(scope.portfolio)
+
+
+@app.get("/alerts", response_model=list[Alert])
+def alerts(
+    customer: str | None = None,
+    transaction: str | None = None,
+    product: str | None = None,
+    risk_level: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    detection_type: str | None = None,
+    scope: AnalystScope = Depends(current_scope),
+):
+    def keep(a: Alert) -> bool:
+        day = a.created_at[:10]
+        return (
+            (not customer or customer.lower() in a.customer_id.lower())
+            and (not transaction or transaction.lower() in (a.transaction_id or "").lower())
+            and (not product or a.product == product)
+            and (not risk_level or a.risk_level == risk_level)
+            and (not date_from or day >= date_from)
+            and (not date_to or day <= date_to)
+            and (not detection_type or detection_type == a.category
+                 or detection_type in {h.rule for h in a.rule_hits})
+        )
+
+    return [a for a in store.alerts(scope.portfolio) if keep(a)]
+
+
+@app.get("/cases", response_model=list[Case])
+def cases(scope: AnalystScope = Depends(current_scope)):
+    return store.cases(scope.portfolio)
+
+
+@app.get("/cases/{case_id}", response_model=CaseDetail)
+def case_detail(case_id: str, scope: AnalystScope = Depends(current_scope)):
+    owned_case(case_id, scope)
+    detail = store.case_detail(case_id)
+    detail.replay_available = replays.replay_file(detail.alert.transaction_id) is not None
+    return detail
+
+
+@app.post("/cases/{case_id}/decision", response_model=Case)
+def decide(case_id: str, body: DecisionRequest, scope: AnalystScope = Depends(current_scope)):
+    case = owned_case(case_id, scope)
+    report = store.get_report(case.investigation_id) if case.investigation_id else None
+    if report and report.verification == "unverified" and not body.note.strip():
+        raise HTTPException(422, "A note is required when the report is Unverified.")
+    store.add_decision(
+        case_id,
+        Decision(decision=body.decision, analyst=scope.analyst_id, note=body.note, at=now()),
+    )
+    store.audit("decision_recorded", analyst_id=scope.analyst_id, case_id=case_id,
+                decision=body.decision, note=body.note)
+    return store.get_case(case_id)
+
+
+@app.post("/cases/{case_id}/investigation", response_model=InvestigationStarted, status_code=202)
+def investigate(
+    case_id: str,
+    background: BackgroundTasks,
+    body: StartInvestigation | None = None,
+    scope: AnalystScope = Depends(current_scope),
+):
+    case = owned_case(case_id, scope)
+    replay = bool(body and body.replay)
+    existing = store.get_investigation(case.investigation_id) if case.investigation_id else None
+    if not replay:
+        if existing:
+            return InvestigationStarted(investigation_id=existing.id)
+        investigation_id = store.start_investigation(case_id)
+        background.add_task(run_investigation, investigation_id, scope, store)
+        return InvestigationStarted(investigation_id=investigation_id)
+
+    path = replays.replay_file(store.get_alert(case.alert_id).transaction_id)
+    if path is None:
+        raise HTTPException(404, "No saved Replay for this Case.")
+    if existing:
+        if existing.status == "running":
+            raise HTTPException(409, "An Investigation is still running.")
+        if existing.report and existing.report.assessment is not None:
+            return InvestigationStarted(investigation_id=existing.id)
+        store.remove_investigation(existing.id)
+        store.audit("investigation_replaced", analyst_id=scope.analyst_id, case_id=case_id,
+                    replaced=existing.id)
+    investigation_id = replays.load(store, case_id, path)
+    store.audit("replay_started", analyst_id=scope.analyst_id, case_id=case_id,
+                investigation_id=investigation_id)
+    return InvestigationStarted(investigation_id=investigation_id)
+
+
+@app.get("/investigations/{investigation_id}", response_model=Investigation)
+def investigation(investigation_id: str, scope: AnalystScope = Depends(current_scope)):
+    return owned_investigation(investigation_id, scope)
+
+
+@app.get("/investigations/{investigation_id}/steps", response_model=list[Step])
+def steps(investigation_id: str, after: int = 0, scope: AnalystScope = Depends(current_scope)):
+    owned_investigation(investigation_id, scope)
+    return store.steps(investigation_id, after)
+
+
+@app.post("/investigations/{investigation_id}/followups", response_model=FollowUp, status_code=202)
+def follow_up(
+    investigation_id: str,
+    body: FollowUpRequest,
+    background: BackgroundTasks,
+    scope: AnalystScope = Depends(current_scope),
+):
+    current = owned_investigation(investigation_id, scope)
+    if current.is_replay:
+        raise HTTPException(409, "Follow-ups are disabled during a Replay.")
+    if current.status == "running" or any(f.answer is None for f in current.follow_ups):
+        raise HTTPException(409, "Wait for the current answer to finish.")
+    row = store.add_follow_up(investigation_id, body.question)
+    background.add_task(answer_followup, investigation_id, row.id, scope, store)
+    return row
+
+
+@app.get("/evals/latest")
+def evals_latest():
+    if not RESULTS.exists():
+        raise HTTPException(404, "No eval run has been saved yet.")
+    return json.loads(RESULTS.read_text())
+
+
+@app.get("/audit")
+def audit(scope: AnalystScope = Depends(current_scope)):
+    rows = store.audit_trail()
+    for row in rows:
+        investigation_id = row["details"].get("investigation_id")
+        row["trace_url"] = store.trace_url(investigation_id) if investigation_id else None
+    return rows

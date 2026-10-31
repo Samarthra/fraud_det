@@ -185,6 +185,7 @@ class CaseDetail(BaseModel):
     case: Case
     alert: Alert
     report: Report | None = None
+    replay_available: bool = False
 
 
 class StartInvestigation(BaseModel):

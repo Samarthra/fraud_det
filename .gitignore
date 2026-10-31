@@ -9,3 +9,5 @@ node_modules/
 dist/
 *.db
 backend/app/evals/results/rehearsal*
+*.db-wal
+*.db-shm

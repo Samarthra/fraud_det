@@ -41,9 +41,30 @@ def check_statement(statement: str, cited: Iterable[Evidence]) -> list[str]:
     return errors
 
 
+def complete_citations(draft: ReportDraft, evidence: list[Evidence]) -> ReportDraft:
+    """Adds a citation when a value is in a record the model forgot to cite.
+
+    A value found in no record still fails, so an invented fact can't pass.
+    """
+    by_id = {e.id: e for e in evidence}
+    findings = []
+    for finding in draft.findings:
+        ids = list(finding.evidence_ids)
+        cited = [by_id[i] for i in ids if i in by_id]
+        for error in check_statement(finding.statement, cited):
+            value = error.split(" is not in")[0].rsplit(" ", 1)[-1]
+            holder = next((e for e in evidence if not check_statement(value, [e])), None)
+            if holder and holder.id not in ids:
+                ids.append(holder.id)
+        findings.append(finding.model_copy(update={"evidence_ids": ids}))
+    return draft.model_copy(update={"findings": findings})
+
+
 def verify(draft: ReportDraft, evidence: list[Evidence]) -> list[str]:
     by_id = {e.id: e for e in evidence}
     errors: list[str] = []
+    if draft.assessment == "suspicious" and "no_action" in draft.recommended_actions:
+        errors.append("no_action cannot be recommended on a suspicious assessment.")
     if not draft.findings:
         errors.append("The report has no findings.")
     for n, finding in enumerate(draft.findings, start=1):

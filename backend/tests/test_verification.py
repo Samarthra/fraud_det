@@ -55,3 +55,26 @@ def test_record_id_in_the_source_ref_counts():
     draft = ReportDraft(assessment="suspicious", summary="s", limitations=[], recommended_actions=[],
                         findings=[Finding(statement="ACC-10042 had a SIM swap.", evidence_ids=["EV-3"])])
     assert verify(draft, [row]) == []
+
+
+def test_no_action_is_rejected_on_a_suspicious_report():
+    draft = ReportDraft(assessment="suspicious", summary="s", limitations=[],
+                        recommended_actions=["hold_transaction", "no_action"],
+                        findings=[Finding(statement="Fine.", evidence_ids=["EV-1"])])
+    assert "no_action" in verify(draft, EVIDENCE)[0]
+
+
+def test_a_true_value_in_an_uncited_record_gets_its_citation():
+    from agent.verification import complete_citations
+    draft = ReportDraft(assessment="suspicious", summary="s", limitations=[], recommended_actions=[],
+                        findings=[Finding(statement="Sent ₹1,85,000 on ACC-10042.", evidence_ids=["EV-2"])])
+    fixed = complete_citations(draft, EVIDENCE)
+    assert fixed.findings[0].evidence_ids == ["EV-2", "EV-1"]
+    assert verify(fixed, EVIDENCE) == []
+
+
+def test_an_invented_value_still_fails_after_completion():
+    from agent.verification import complete_citations
+    draft = ReportDraft(assessment="suspicious", summary="s", limitations=[], recommended_actions=[],
+                        findings=[Finding(statement="Sent ₹7,77,777.", evidence_ids=["EV-1"])])
+    assert verify(complete_citations(draft, EVIDENCE), EVIDENCE)

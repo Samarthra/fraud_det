@@ -17,7 +17,7 @@ from . import llm as models
 from . import tracing
 from .ports import AgentStore
 from .prompts import EVIDENCE_SYSTEM, FOLLOW_UP_SYSTEM, SYNTHESIS_SYSTEM
-from .verification import check_statement, verify
+from .verification import check_statement, complete_citations, verify
 
 RECURSION_LIMIT = 14  # about 6 tool steps
 
@@ -133,8 +133,11 @@ def build_graph(store: AgentStore, gather: Gather, synthesise: Synthesise):
 
     def verification(state: InvestigationState, config: RunnableConfig):
         errors = list(state["verification_errors"])
-        if state["draft"]:
-            errors += verify(state["draft"], list(state["evidence"].values()))
+        draft = state["draft"]
+        if draft:
+            found = list(state["evidence"].values())
+            draft = complete_citations(draft, found)
+            errors += verify(draft, found)
         summary = "All claims match their Evidence" if not errors else f"{len(errors)} problem(s) found"
         step(state, "verification", "verification", summary)
         store.audit(
@@ -143,7 +146,7 @@ def build_graph(store: AgentStore, gather: Gather, synthesise: Synthesise):
             errors=errors,
             attempt=state.get("attempt", 0),
         )
-        return {"verification_errors": errors, "attempt": state.get("attempt", 0) + 1}
+        return {"draft": draft, "verification_errors": errors, "attempt": state.get("attempt", 0) + 1}
 
     def after_verification(state: InvestigationState) -> str:
         return "synthesis" if state["verification_errors"] and state["attempt"] < 2 else "report"
@@ -194,6 +197,9 @@ def run_investigation(
     try:
         alert = store.get_alert_for_investigation(investigation_id)
         store.audit("investigation_started", investigation_id=investigation_id)
+        url = tracing.trace_url(investigation_id)
+        if url:  # set first, because the UI stops polling once the report is saved
+            store.set_trace_url(investigation_id, url)
         graph = build_graph(
             store, gather or gather_with_model(store), synthesise or synthesise_with_model()
         )
@@ -207,9 +213,6 @@ def run_investigation(
             },
             tracing.trace_config(investigation_id),
         )
-        url = tracing.trace_url(investigation_id)
-        if url:
-            store.set_trace_url(investigation_id, url)
     except Exception as e:
         reason = f"The Investigation failed: {type(e).__name__}"
         store.audit("investigation_failed", investigation_id=investigation_id, reason=str(e))

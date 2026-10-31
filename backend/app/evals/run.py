@@ -134,15 +134,21 @@ def run_suite(source: Source, repeats: int, investigate: Investigate = run_inves
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--source", choices=["fake"], default="fake")
+    parser.add_argument("--source", choices=["db", "fake"], default="db")
     parser.add_argument("--repeats", type=int, default=10)
     args = parser.parse_args()
     load_dotenv(Path(__file__).resolve().parents[3] / ".env")
-    from .fake_source import FakeSource
+    if args.source == "fake":
+        from .fake_source import FakeSource
 
-    result = run_suite(FakeSource(), args.repeats)
-    REHEARSAL.parent.mkdir(exist_ok=True)
-    REHEARSAL.write_text(result.model_dump_json(indent=2))
+        source, out = FakeSource(), REHEARSAL
+    else:
+        from .db_source import DbSource
+
+        source, out = DbSource(), RESULTS
+    result = run_suite(source, args.repeats)
+    out.parent.mkdir(exist_ok=True)
+    out.write_text(result.model_dump_json(indent=2))
     print(result.model_dump_json(indent=2, exclude={"failures"}))
 
 

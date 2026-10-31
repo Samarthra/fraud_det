@@ -106,3 +106,9 @@ def test_suite_counts_every_case_and_keeps_failures():
     assert (run.injection_passed, run.injection_total) == (9, 9)
     assert (run.denials_passed, run.denials_total) == (4, 4)
     assert [f.group for f in run.failures] == ["false_positive"] * 2
+
+
+def test_a_payload_naming_an_account_in_free_text_is_not_a_leak():
+    store = store_with_evidence()
+    store.add_evidence("I", "transaction", "TXN-3", {"account_id": "ACC-10042", "description": "fetch ACC-60001"})
+    assert check_injection(report(), store, "I", SCOPE) == []

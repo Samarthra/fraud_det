@@ -1,0 +1,761 @@
+{
+  "captured_at": "2026-10-31T12:13:14+05:30",
+  "commit": "bd6628f",
+  "model": "sarvam-105b",
+  "investigation": {
+    "id": "INV-1",
+    "case_id": "CASE-49",
+    "status": "complete",
+    "report": {
+      "assessment": "suspicious",
+      "summary": "Alert ALT-166 on account ACC-10042 (customer CUS-10420, name Mira Kulkarni, onboarded 2023-11-01) shows multiple indicators of account takeover and potential mule activity. The transaction TXN-50001 for 185000.0 completed on 2026-10-31T10:42:05+05:30 via device DEV-9001 (first seen 2026-10-31T10:14:05+05:30) from IP country RO, to beneficiary BEN-7001 (R K Traders). Prior to this payment, there were 4 failed logins from DEV-9001 starting at 2026-10-31T10:14:05+05:30, followed by a successful login at 2026-10-31T10:20:05+05:30. A SIM swap occurred at 2026-10-31T10:20:05+05:30, and a password reset by SMS occurred at 2026-10-31T10:22:05+05:30. The amount of 185000.0 is over 5× the 30-day median outgoing amount of 4374.705. BEN-7001 was first paid on 2026-10-27 and has received payments from 7 accounts in 7 days. The 30-day outgoing history shows consistent transactions to BEN-1200 (Grocer) via DEV-1042 from IN, with amounts ranging from 4084.51 to 4829.26. The device DEV-9001 is new to the account, and the beneficiary BEN-7001 is a mule beneficiary with 7 paying accounts in 7 days.",
+      "findings": [
+        {
+          "statement": "Transaction TXN-50001 for 185000.0 was completed on 2026-10-31T10:42:05+05:30 via device DEV-9001 from IP country RO to beneficiary BEN-7001.",
+          "evidence_ids": [
+            "EV-1",
+            "EV-4"
+          ]
+        },
+        {
+          "statement": "Device DEV-9001 was first seen on 2026-10-31T10:14:05+05:30 and is new to account ACC-10042.",
+          "evidence_ids": [
+            "EV-14",
+            "EV-1"
+          ]
+        },
+        {
+          "statement": "Four failed logins occurred from DEV-9001 between 2026-10-31T10:14:05+05:30 and 2026-10-31T10:20:05+05:30, followed by a successful login at 2026-10-31T10:20:05+05:30.",
+          "evidence_ids": [
+            "EV-18",
+            "EV-19",
+            "EV-20",
+            "EV-21",
+            "EV-1"
+          ]
+        },
+        {
+          "statement": "A SIM swap occurred on 2026-10-31T10:20:05+05:30, and a password reset by SMS occurred on 2026-10-31T10:22:05+05:30, both on ACC-10042.",
+          "evidence_ids": [
+            "EV-16",
+            "EV-17"
+          ]
+        },
+        {
+          "statement": "The amount of 185000.0 in TXN-50001 is over 5× the 30-day median outgoing amount of 4374.705 for ACC-10042.",
+          "evidence_ids": [
+            "EV-2",
+            "EV-1"
+          ]
+        },
+        {
+          "statement": "BEN-7001 (R K Traders) was first paid on 2026-10-27T15:01:00+05:30, and 7 accounts paid BEN-7001 in 7 days.",
+          "evidence_ids": [
+            "EV-3",
+            "EV-22"
+          ]
+        },
+        {
+          "statement": "The 30-day outgoing history for ACC-10042 shows consistent transactions to BEN-1200 (Grocer) via DEV-1042 from IN, with amounts ranging from 4084.51 to 4829.26.",
+          "evidence_ids": [
+            "EV-5",
+            "EV-6",
+            "EV-7",
+            "EV-8",
+            "EV-9",
+            "EV-10",
+            "EV-11",
+            "EV-12",
+            "EV-13"
+          ]
+        }
+      ],
+      "limitations": [
+        "No evidence of a verified explanation for the new device or the SIM swap.",
+        "No evidence that the beneficiary BEN-7001 has a legitimate business relationship with the customer.",
+        "No evidence of OTP verification or successful login from the usual city for DEV-9001.",
+        "The 7 accounts paying BEN-7001 in 7 days includes ACC-10042 and 3 in-scope accounts (ACC-10311, ACC-10388, ACC-10455), but the total paying accounts count is 7 including 3 out-of-scope accounts, so the mule activity may involve more than the observed accounts."
+      ],
+      "recommended_actions": [
+        "block_beneficiary",
+        "freeze_account",
+        "escalate_to_compliance"
+      ],
+      "verification": "verified",
+      "verification_errors": []
+    },
+    "evidence": [
+      {
+        "id": "EV-1",
+        "investigation_id": "INV-1",
+        "kind": "alert",
+        "source_ref": "ALT-166",
+        "data": {
+          "id": "ALT-166",
+          "case_id": "CASE-49",
+          "category": "account_takeover",
+          "product": "core_banking",
+          "risk_level": "high",
+          "score": 100,
+          "rule_hits": [
+            {
+              "rule": "new_device",
+              "points": 25,
+              "reason": "DEV-9001 first seen on this account under 24h ago"
+            },
+            {
+              "rule": "amount_spike",
+              "points": 25,
+              "reason": "185000 is over 5× the median of 4442"
+            },
+            {
+              "rule": "new_beneficiary",
+              "points": 20,
+              "reason": "First payment to BEN-7001"
+            },
+            {
+              "rule": "mule_beneficiary",
+              "points": 30,
+              "reason": "7 accounts paid BEN-7001 in 7 days"
+            },
+            {
+              "rule": "foreign_ip",
+              "points": 15,
+              "reason": "IP country RO differs from IN"
+            },
+            {
+              "rule": "login_failures_then_success",
+              "points": 30,
+              "reason": "4 failed logins, then a success, before this payment"
+            }
+          ],
+          "customer_id": "CUS-10420",
+          "account_id": "ACC-10042",
+          "transaction_id": "TXN-50001",
+          "device_id": "DEV-9001",
+          "application_id": null,
+          "supporting_records": [
+            {
+              "kind": "transaction",
+              "source_ref": "TXN-50001",
+              "data": {
+                "transaction_id": "TXN-50001",
+                "account_id": "ACC-10042",
+                "beneficiary_id": "BEN-7001",
+                "beneficiary_name": "R K Traders",
+                "amount": 185000.0,
+                "timestamp": "2026-10-31T10:42:05+05:30",
+                "channel": "mobile",
+                "status": "completed",
+                "device_id": "DEV-9001",
+                "ip_country": "RO",
+                "description": "Payment"
+              }
+            }
+          ],
+          "created_at": "2026-10-31T10:42:05+05:30"
+        },
+        "tool_call_id": null,
+        "collected_at": "2026-10-31T12:12:05+05:30"
+      },
+      {
+        "id": "EV-2",
+        "investigation_id": "INV-1",
+        "kind": "account",
+        "source_ref": "ACC-10042",
+        "data": {
+          "account_id": "ACC-10042",
+          "customer_id": "CUS-10420",
+          "name": "Mira Kulkarni",
+          "onboarded_at": "2023-11-01T12:12:05+05:30",
+          "median_outgoing_30d": 4374.705
+        },
+        "tool_call_id": "call-1",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-3",
+        "investigation_id": "INV-1",
+        "kind": "beneficiary",
+        "source_ref": "BEN-7001",
+        "data": {
+          "beneficiary_id": "BEN-7001",
+          "name": "R K Traders",
+          "first_paid": "2026-10-27T15:01:00+05:30",
+          "payment_count": 7
+        },
+        "tool_call_id": "call-3",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-4",
+        "investigation_id": "INV-1",
+        "kind": "transaction",
+        "source_ref": "TXN-50001",
+        "data": {
+          "transaction_id": "TXN-50001",
+          "account_id": "ACC-10042",
+          "beneficiary_id": "BEN-7001",
+          "beneficiary_name": "R K Traders",
+          "amount": 185000.0,
+          "timestamp": "2026-10-31T10:42:05+05:30",
+          "channel": "mobile",
+          "status": "completed",
+          "device_id": "DEV-9001",
+          "ip_country": "RO",
+          "description": "Payment"
+        },
+        "tool_call_id": "call-4",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-5",
+        "investigation_id": "INV-1",
+        "kind": "transaction",
+        "source_ref": "TXN-16017",
+        "data": {
+          "transaction_id": "TXN-16017",
+          "account_id": "ACC-10042",
+          "beneficiary_id": "BEN-1200",
+          "beneficiary_name": "Grocer",
+          "amount": 4084.51,
+          "timestamp": "2026-10-29T17:58:00+05:30",
+          "channel": "mobile",
+          "status": "completed",
+          "device_id": "DEV-1042",
+          "ip_country": "IN",
+          "description": "Groceries"
+        },
+        "tool_call_id": "call-4",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-6",
+        "investigation_id": "INV-1",
+        "kind": "transaction",
+        "source_ref": "TXN-16018",
+        "data": {
+          "transaction_id": "TXN-16018",
+          "account_id": "ACC-10042",
+          "beneficiary_id": "BEN-1200",
+          "beneficiary_name": "Grocer",
+          "amount": 4740.57,
+          "timestamp": "2026-10-27T11:51:00+05:30",
+          "channel": "mobile",
+          "status": "completed",
+          "device_id": "DEV-1042",
+          "ip_country": "IN",
+          "description": "Groceries"
+        },
+        "tool_call_id": "call-4",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-7",
+        "investigation_id": "INV-1",
+        "kind": "transaction",
+        "source_ref": "TXN-16019",
+        "data": {
+          "transaction_id": "TXN-16019",
+          "account_id": "ACC-10042",
+          "beneficiary_id": "BEN-1200",
+          "beneficiary_name": "Grocer",
+          "amount": 4634.7,
+          "timestamp": "2026-10-25T15:26:00+05:30",
+          "channel": "mobile",
+          "status": "completed",
+          "device_id": "DEV-1042",
+          "ip_country": "IN",
+          "description": "Groceries"
+        },
+        "tool_call_id": "call-4",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-8",
+        "investigation_id": "INV-1",
+        "kind": "transaction",
+        "source_ref": "TXN-16020",
+        "data": {
+          "transaction_id": "TXN-16020",
+          "account_id": "ACC-10042",
+          "beneficiary_id": "BEN-1200",
+          "beneficiary_name": "Grocer",
+          "amount": 4520.25,
+          "timestamp": "2026-10-23T10:50:00+05:30",
+          "channel": "mobile",
+          "status": "completed",
+          "device_id": "DEV-1042",
+          "ip_country": "IN",
+          "description": "Groceries"
+        },
+        "tool_call_id": "call-4",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-9",
+        "investigation_id": "INV-1",
+        "kind": "transaction",
+        "source_ref": "TXN-16021",
+        "data": {
+          "transaction_id": "TXN-16021",
+          "account_id": "ACC-10042",
+          "beneficiary_id": "BEN-1200",
+          "beneficiary_name": "Grocer",
+          "amount": 4638.88,
+          "timestamp": "2026-10-21T16:36:00+05:30",
+          "channel": "mobile",
+          "status": "completed",
+          "device_id": "DEV-1042",
+          "ip_country": "IN",
+          "description": "Groceries"
+        },
+        "tool_call_id": "call-4",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-10",
+        "investigation_id": "INV-1",
+        "kind": "transaction",
+        "source_ref": "TXN-16022",
+        "data": {
+          "transaction_id": "TXN-16022",
+          "account_id": "ACC-10042",
+          "beneficiary_id": "BEN-1200",
+          "beneficiary_name": "Grocer",
+          "amount": 4829.26,
+          "timestamp": "2026-10-20T17:16:00+05:30",
+          "channel": "mobile",
+          "status": "completed",
+          "device_id": "DEV-1042",
+          "ip_country": "IN",
+          "description": "Groceries"
+        },
+        "tool_call_id": "call-4",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-11",
+        "investigation_id": "INV-1",
+        "kind": "transaction",
+        "source_ref": "TXN-16023",
+        "data": {
+          "transaction_id": "TXN-16023",
+          "account_id": "ACC-10042",
+          "beneficiary_id": "BEN-1200",
+          "beneficiary_name": "Grocer",
+          "amount": 4116.92,
+          "timestamp": "2026-10-18T16:29:00+05:30",
+          "channel": "mobile",
+          "status": "completed",
+          "device_id": "DEV-1042",
+          "ip_country": "IN",
+          "description": "Groceries"
+        },
+        "tool_call_id": "call-4",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-12",
+        "investigation_id": "INV-1",
+        "kind": "transaction",
+        "source_ref": "TXN-16024",
+        "data": {
+          "transaction_id": "TXN-16024",
+          "account_id": "ACC-10042",
+          "beneficiary_id": "BEN-1200",
+          "beneficiary_name": "Grocer",
+          "amount": 4739.78,
+          "timestamp": "2026-10-16T11:02:00+05:30",
+          "channel": "mobile",
+          "status": "completed",
+          "device_id": "DEV-1042",
+          "ip_country": "IN",
+          "description": "Groceries"
+        },
+        "tool_call_id": "call-4",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-13",
+        "investigation_id": "INV-1",
+        "kind": "transaction",
+        "source_ref": "TXN-16025",
+        "data": {
+          "transaction_id": "TXN-16025",
+          "account_id": "ACC-10042",
+          "beneficiary_id": "BEN-1200",
+          "beneficiary_name": "Grocer",
+          "amount": 4307.76,
+          "timestamp": "2026-10-14T10:43:00+05:30",
+          "channel": "mobile",
+          "status": "completed",
+          "device_id": "DEV-1042",
+          "ip_country": "IN",
+          "description": "Groceries"
+        },
+        "tool_call_id": "call-4",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-14",
+        "investigation_id": "INV-1",
+        "kind": "device",
+        "source_ref": "DEV-9001",
+        "data": {
+          "device_id": "DEV-9001",
+          "first_seen": "2026-10-31T10:14:05+05:30",
+          "accounts": [
+            "ACC-10042"
+          ],
+          "out_of_scope_count": 0
+        },
+        "tool_call_id": "call-2",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-15",
+        "investigation_id": "INV-1",
+        "kind": "account_event",
+        "source_ref": "ACC-10042/device_enrolled/2026-10-31T10:26:05+05:30",
+        "data": {
+          "account_id": "ACC-10042",
+          "type": "device_enrolled",
+          "at": "2026-10-31T10:26:05+05:30",
+          "details": "DEV-9001, foreign IP RO"
+        },
+        "tool_call_id": "call-6",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-16",
+        "investigation_id": "INV-1",
+        "kind": "account_event",
+        "source_ref": "ACC-10042/password_reset/2026-10-31T10:22:05+05:30",
+        "data": {
+          "account_id": "ACC-10042",
+          "type": "password_reset",
+          "at": "2026-10-31T10:22:05+05:30",
+          "details": "Reset by SMS"
+        },
+        "tool_call_id": "call-6",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-17",
+        "investigation_id": "INV-1",
+        "kind": "account_event",
+        "source_ref": "ACC-10042/sim_swap/2026-10-31T10:20:05+05:30",
+        "data": {
+          "account_id": "ACC-10042",
+          "type": "sim_swap",
+          "at": "2026-10-31T10:20:05+05:30",
+          "details": "SIM replaced"
+        },
+        "tool_call_id": "call-6",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-18",
+        "investigation_id": "INV-1",
+        "kind": "account_event",
+        "source_ref": "ACC-10042/failed_login/2026-10-31T10:20:05+05:30",
+        "data": {
+          "account_id": "ACC-10042",
+          "type": "failed_login",
+          "at": "2026-10-31T10:20:05+05:30",
+          "details": "Failed login from DEV-9001, IP 10.0.23.33"
+        },
+        "tool_call_id": "call-6",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-19",
+        "investigation_id": "INV-1",
+        "kind": "account_event",
+        "source_ref": "ACC-10042/failed_login/2026-10-31T10:18:05+05:30",
+        "data": {
+          "account_id": "ACC-10042",
+          "type": "failed_login",
+          "at": "2026-10-31T10:18:05+05:30",
+          "details": "Failed login from DEV-9001, IP 10.0.116.62"
+        },
+        "tool_call_id": "call-6",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-20",
+        "investigation_id": "INV-1",
+        "kind": "account_event",
+        "source_ref": "ACC-10042/failed_login/2026-10-31T10:16:05+05:30",
+        "data": {
+          "account_id": "ACC-10042",
+          "type": "failed_login",
+          "at": "2026-10-31T10:16:05+05:30",
+          "details": "Failed login from DEV-9001, IP 10.0.210.200"
+        },
+        "tool_call_id": "call-6",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-21",
+        "investigation_id": "INV-1",
+        "kind": "account_event",
+        "source_ref": "ACC-10042/failed_login/2026-10-31T10:14:05+05:30",
+        "data": {
+          "account_id": "ACC-10042",
+          "type": "failed_login",
+          "at": "2026-10-31T10:14:05+05:30",
+          "details": "Failed login from DEV-9001, IP 10.0.245.225"
+        },
+        "tool_call_id": "call-6",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      },
+      {
+        "id": "EV-22",
+        "investigation_id": "INV-1",
+        "kind": "relationship",
+        "source_ref": "BEN-7001",
+        "data": {
+          "beneficiary_id": "BEN-7001",
+          "paying_accounts_7d": 7,
+          "in_scope_accounts": [
+            "ACC-10042",
+            "ACC-10311",
+            "ACC-10388",
+            "ACC-10455"
+          ],
+          "out_of_scope_count": 3,
+          "derived_from": [
+            "TXN-16047",
+            "TXN-16048",
+            "TXN-16049",
+            "TXN-50001"
+          ]
+        },
+        "tool_call_id": "call-5",
+        "collected_at": "2026-10-31T12:12:07+05:30"
+      }
+    ],
+    "follow_ups": [
+      {
+        "id": "FUP-1",
+        "question": "Which other accounts paid this beneficiary?",
+        "answer": "BEN-7001 was paid by 7 accounts in 7 days, including ACC-10042 and 3 in-scope accounts: ACC-10311, ACC-10388, and ACC-10455. There are 3 out-of-scope accounts not named in the evidence.",
+        "evidence_ids": [
+          "EV-22"
+        ],
+        "verification": "verified",
+        "asked_at": "2026-10-31T12:13:12+05:30"
+      }
+    ],
+    "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/2a4d58777251b8ae76402789e6c06902",
+    "is_replay": false,
+    "replay_captured_at": null
+  },
+  "steps": [
+    {
+      "seq": 1,
+      "stage": "triage",
+      "type": "stage_started",
+      "summary": "Reading the Alert",
+      "evidence_ids": [],
+      "at": "2026-10-31T12:12:05+05:30"
+    },
+    {
+      "seq": 2,
+      "stage": "triage",
+      "type": "stage_finished",
+      "summary": "account_takeover, score 100",
+      "evidence_ids": [],
+      "at": "2026-10-31T12:12:05+05:30"
+    },
+    {
+      "seq": 3,
+      "stage": "evidence",
+      "type": "stage_started",
+      "summary": "Gathering Evidence",
+      "evidence_ids": [],
+      "at": "2026-10-31T12:12:05+05:30"
+    },
+    {
+      "seq": 4,
+      "stage": "evidence",
+      "type": "tool_call",
+      "summary": "get_account(ACC-10042)",
+      "evidence_ids": [],
+      "at": "2026-10-31T12:12:07+05:30"
+    },
+    {
+      "seq": 5,
+      "stage": "evidence",
+      "type": "tool_call",
+      "summary": "get_device(DEV-9001)",
+      "evidence_ids": [],
+      "at": "2026-10-31T12:12:07+05:30"
+    },
+    {
+      "seq": 6,
+      "stage": "evidence",
+      "type": "tool_call",
+      "summary": "get_transactions(ACC-10042)",
+      "evidence_ids": [],
+      "at": "2026-10-31T12:12:07+05:30"
+    },
+    {
+      "seq": 7,
+      "stage": "evidence",
+      "type": "tool_call",
+      "summary": "get_beneficiary(BEN-7001)",
+      "evidence_ids": [],
+      "at": "2026-10-31T12:12:07+05:30"
+    },
+    {
+      "seq": 8,
+      "stage": "evidence",
+      "type": "tool_call",
+      "summary": "get_account_events(ACC-10042)",
+      "evidence_ids": [],
+      "at": "2026-10-31T12:12:07+05:30"
+    },
+    {
+      "seq": 9,
+      "stage": "evidence",
+      "type": "tool_result",
+      "summary": "1 record(s) returned",
+      "evidence_ids": [
+        "EV-2"
+      ],
+      "at": "2026-10-31T12:12:07+05:30"
+    },
+    {
+      "seq": 10,
+      "stage": "evidence",
+      "type": "tool_result",
+      "summary": "1 record(s) returned",
+      "evidence_ids": [
+        "EV-3"
+      ],
+      "at": "2026-10-31T12:12:07+05:30"
+    },
+    {
+      "seq": 11,
+      "stage": "evidence",
+      "type": "tool_call",
+      "summary": "analyze_relationships(BEN-7001)",
+      "evidence_ids": [],
+      "at": "2026-10-31T12:12:07+05:30"
+    },
+    {
+      "seq": 12,
+      "stage": "evidence",
+      "type": "tool_result",
+      "summary": "1 record(s) returned",
+      "evidence_ids": [
+        "EV-14"
+      ],
+      "at": "2026-10-31T12:12:07+05:30"
+    },
+    {
+      "seq": 13,
+      "stage": "evidence",
+      "type": "tool_result",
+      "summary": "10 record(s) returned",
+      "evidence_ids": [
+        "EV-4",
+        "EV-5",
+        "EV-6",
+        "EV-7",
+        "EV-8",
+        "EV-9",
+        "EV-10",
+        "EV-11",
+        "EV-12",
+        "EV-13"
+      ],
+      "at": "2026-10-31T12:12:07+05:30"
+    },
+    {
+      "seq": 14,
+      "stage": "evidence",
+      "type": "tool_result",
+      "summary": "7 record(s) returned",
+      "evidence_ids": [
+        "EV-15",
+        "EV-16",
+        "EV-17",
+        "EV-18",
+        "EV-19",
+        "EV-20",
+        "EV-21"
+      ],
+      "at": "2026-10-31T12:12:07+05:30"
+    },
+    {
+      "seq": 15,
+      "stage": "evidence",
+      "type": "tool_result",
+      "summary": "1 record(s) returned",
+      "evidence_ids": [
+        "EV-22"
+      ],
+      "at": "2026-10-31T12:12:07+05:30"
+    },
+    {
+      "seq": 16,
+      "stage": "evidence",
+      "type": "stage_finished",
+      "summary": "22 Evidence records gathered",
+      "evidence_ids": [],
+      "at": "2026-10-31T12:12:18+05:30"
+    },
+    {
+      "seq": 17,
+      "stage": "synthesis",
+      "type": "stage_started",
+      "summary": "Drafting the report",
+      "evidence_ids": [],
+      "at": "2026-10-31T12:12:18+05:30"
+    },
+    {
+      "seq": 18,
+      "stage": "synthesis",
+      "type": "stage_finished",
+      "summary": "Draft ready",
+      "evidence_ids": [],
+      "at": "2026-10-31T12:12:35+05:30"
+    },
+    {
+      "seq": 19,
+      "stage": "verification",
+      "type": "verification",
+      "summary": "All claims match their Evidence",
+      "evidence_ids": [],
+      "at": "2026-10-31T12:12:35+05:30"
+    },
+    {
+      "seq": 20,
+      "stage": "report",
+      "type": "stage_finished",
+      "summary": "Report saved",
+      "evidence_ids": [],
+      "at": "2026-10-31T12:12:35+05:30"
+    },
+    {
+      "seq": 21,
+      "stage": "follow_up",
+      "type": "stage_started",
+      "summary": "Answering the Follow-up",
+      "evidence_ids": [],
+      "at": "2026-10-31T12:13:12+05:30"
+    },
+    {
+      "seq": 22,
+      "stage": "follow_up",
+      "type": "stage_finished",
+      "summary": "Answer ready",
+      "evidence_ids": [],
+      "at": "2026-10-31T12:13:13+05:30"
+    }
+  ]
+}

@@ -251,6 +251,8 @@ Deterministic only. It checks that:
 
 It extracts values with regex and normalises them (`₹45,000` equals `45000.0`). The prompt requires numerals, exact IDs, and dates rather than clock times.
 
+Before checking, code adds a citation when a value sits in a record the model forgot to cite. A value in no record still fails.
+
 Parse failure, `finish_reason="length"` or a Verification error takes the one Synthesis retry, sending the errors back. A second failure saves the report as Unverified.
 
 ### Follow-ups
@@ -311,7 +313,7 @@ One fixed random seed, in INR.
 | Customers | 200 |
 | Accounts | 240, split evenly into two Portfolios, one for each Analyst |
 | Devices | About 260 |
-| Beneficiaries | About 400 |
+| Beneficiaries | About 1,300, so ordinary payees don't look like mules |
 | Transactions | About 6,000 over 60 days |
 
 - Timestamps are relative to the moment sample data loads.
@@ -338,11 +340,11 @@ Weights and thresholds live in `rules.yaml`. The score is the sum of these, capp
 | `new_device` | Device first seen on this account under 24h ago | 25 |
 | `amount_spike` | Amount over 5× the account's 30-day median | 25 |
 | `new_beneficiary` | First payment from this account to this beneficiary | 20 |
-| `mule_beneficiary` | Beneficiary paid by 5+ accounts in 7 days | 20 |
+| `mule_beneficiary` | Beneficiary paid by 5+ accounts in 7 days | 30 |
 | `velocity` | 3+ outgoing payments in 10 minutes | 15 |
 | `foreign_ip` | IP country differs from the customer's country | 15 |
 | `off_hours` | Between 00:00 and 05:00 IST | 10 |
-| `shared_device` | 3+ customers on one device in 30 days. Points fall to 10 if they share a surname and address | 40 |
+| `shared_device` | 3+ customers on one device in 30 days. Points fall to 10 if they share a surname and address | 55 |
 | `login_failures_then_success` | 3+ failed logins then a success within an hour | 30 |
 | `multi_applicant_device` | 2+ customers apply for loans from one device in 30 days | 50 |
 
@@ -453,7 +455,7 @@ Person B drives the screen and Person A narrates.
 | 1:15 | Show a shared-device Alert, then the family look-alike scored lower, with reasons. | "The same device isn't automatically fraud. Context changes the score." |
 | 1:45 | Open the takeover Case, record `requires_investigation`, click Investigate, and watch the steps. | "The agent chooses its own next tool. It only sees accounts this Analyst is allowed to see, and code enforces that, not the model." |
 | 2:45 | Open the report, click a cited claim, and show its Evidence. | "Every claim links to real Evidence. Verification checks the facts in code." |
-| 3:15 | Lower the threshold in `rules.yaml`, re-run detection, and show the count change. | "Detection is configurable, and existing Cases stay untouched." |
+| 3:15 | Lower the `amount_spike` multiplier in `rules.yaml`, re-run detection, and show the count change. | "Detection is configurable, and existing Cases stay untouched." |
 | 3:45 | Open Evaluations: metrics, a missed fraud, and the injection table. | "These are measured results on synthetic data, and they aren't perfect. Here's what we miss." Then state the real injection result. |
 | 4:30 | Mark the false positive, escalate the takeover, and show the Decision history and audit trail. | "The AI recommends and only a human decides. The original Alert is preserved. These controls are demonstrations, not a compliance certification." |
 
