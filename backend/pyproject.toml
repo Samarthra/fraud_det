@@ -1,0 +1,29 @@
+[project]
+name = "fraudlens"
+version = "0.1.0"
+requires-python = "==3.13.*"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "python-multipart",
+    "pyyaml",
+    "openpyxl",
+    "networkx",
+    "langgraph==1.2.19",
+    "langchain==1.4.7",
+    "langchain-core==1.7.3",
+    "langchain-openai==1.7.3",
+    "openai==2.54.0",
+    "langfuse==5.1.0",
+    "pydantic==2.14.2",
+]
+
+[dependency-groups]
+dev = ["pytest", "httpx"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["app"]
+testpaths = ["tests"]

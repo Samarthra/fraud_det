@@ -1,0 +1,435 @@
+{
+  "case": {
+    "case": {
+      "id": "CASE-12",
+      "alert_id": "ALT-12",
+      "customer_id": "CUS-1042",
+      "account_id": "ACC-10042",
+      "category": "account_takeover",
+      "risk_level": "high",
+      "supporting_records": [
+        {
+          "kind": "transaction",
+          "source_ref": "TXN-50001",
+          "data": {
+            "transaction_id": "TXN-50001",
+            "account_id": "ACC-10042",
+            "beneficiary_id": "BEN-7001",
+            "beneficiary_name": "R K Traders",
+            "amount": 185000.0,
+            "timestamp": "2026-10-31T16:21:00+05:30",
+            "channel": "mobile",
+            "status": "completed",
+            "device_id": "DEV-9001",
+            "ip_country": "RO"
+          }
+        }
+      ],
+      "status": "report_ready",
+      "decisions": [
+        {
+          "decision": "requires_investigation",
+          "analyst": "analyst-1",
+          "note": "High-risk transfer after a new device",
+          "at": "2026-10-31T16:21:40+05:30"
+        }
+      ],
+      "investigation_id": "INV-1"
+    },
+    "alert": {
+      "id": "ALT-12",
+      "case_id": "CASE-12",
+      "category": "account_takeover",
+      "product": "core_banking",
+      "risk_level": "high",
+      "score": 100,
+      "rule_hits": [
+        {
+          "rule": "login_failures_then_success",
+          "points": 30,
+          "reason": "4 failed logins, then a success"
+        },
+        {
+          "rule": "new_device",
+          "points": 25,
+          "reason": "DEV-9001 first seen under 24h ago"
+        },
+        {
+          "rule": "amount_spike",
+          "points": 25,
+          "reason": "₹1,85,000 is 44× the ₹4,200 median"
+        },
+        {
+          "rule": "new_beneficiary",
+          "points": 20,
+          "reason": "First payment to BEN-7001"
+        },
+        {
+          "rule": "mule_beneficiary",
+          "points": 20,
+          "reason": "6 accounts paid BEN-7001 in 7 days"
+        },
+        {
+          "rule": "foreign_ip",
+          "points": 15,
+          "reason": "IP country RO differs from IN"
+        }
+      ],
+      "customer_id": "CUS-1042",
+      "account_id": "ACC-10042",
+      "transaction_id": "TXN-50001",
+      "device_id": "DEV-9001",
+      "application_id": null,
+      "supporting_records": [
+        {
+          "kind": "transaction",
+          "source_ref": "TXN-50001",
+          "data": {
+            "transaction_id": "TXN-50001",
+            "account_id": "ACC-10042",
+            "beneficiary_id": "BEN-7001",
+            "beneficiary_name": "R K Traders",
+            "amount": 185000.0,
+            "timestamp": "2026-10-31T16:21:00+05:30",
+            "channel": "mobile",
+            "status": "completed",
+            "device_id": "DEV-9001",
+            "ip_country": "RO"
+          }
+        }
+      ],
+      "created_at": "2026-10-31T16:21:00+05:30"
+    },
+    "report": {
+      "assessment": "suspicious",
+      "summary": "ACC-10042 shows the pattern of an account takeover ending in a large transfer to a likely mule.",
+      "findings": [
+        {
+          "statement": "A SIM swap and password reset preceded the first use of DEV-9001.",
+          "evidence_ids": [
+            "EV-3",
+            "EV-4",
+            "EV-5"
+          ]
+        },
+        {
+          "statement": "TXN-50001 sent 185000 to BEN-7001, against a 30-day median of 4200.",
+          "evidence_ids": [
+            "EV-1",
+            "EV-2"
+          ]
+        },
+        {
+          "statement": "6 accounts paid BEN-7001 in 7 days, which suggests a mule beneficiary.",
+          "evidence_ids": [
+            "EV-6"
+          ]
+        }
+      ],
+      "limitations": [
+        "3 of the accounts paying BEN-7001 are outside this Analyst's Portfolio."
+      ],
+      "recommended_actions": [
+        "hold_transaction",
+        "block_beneficiary",
+        "contact_customer"
+      ],
+      "verification": "verified",
+      "verification_errors": []
+    }
+  },
+  "investigation": {
+    "id": "INV-1",
+    "case_id": "CASE-12",
+    "status": "complete",
+    "report": {
+      "assessment": "suspicious",
+      "summary": "ACC-10042 shows the pattern of an account takeover ending in a large transfer to a likely mule.",
+      "findings": [
+        {
+          "statement": "A SIM swap and password reset preceded the first use of DEV-9001.",
+          "evidence_ids": [
+            "EV-3",
+            "EV-4",
+            "EV-5"
+          ]
+        },
+        {
+          "statement": "TXN-50001 sent 185000 to BEN-7001, against a 30-day median of 4200.",
+          "evidence_ids": [
+            "EV-1",
+            "EV-2"
+          ]
+        },
+        {
+          "statement": "6 accounts paid BEN-7001 in 7 days, which suggests a mule beneficiary.",
+          "evidence_ids": [
+            "EV-6"
+          ]
+        }
+      ],
+      "limitations": [
+        "3 of the accounts paying BEN-7001 are outside this Analyst's Portfolio."
+      ],
+      "recommended_actions": [
+        "hold_transaction",
+        "block_beneficiary",
+        "contact_customer"
+      ],
+      "verification": "verified",
+      "verification_errors": []
+    },
+    "evidence": [
+      {
+        "id": "EV-1",
+        "investigation_id": "INV-1",
+        "kind": "transaction",
+        "source_ref": "TXN-50001",
+        "data": {
+          "transaction_id": "TXN-50001",
+          "account_id": "ACC-10042",
+          "beneficiary_id": "BEN-7001",
+          "beneficiary_name": "R K Traders",
+          "amount": 185000.0,
+          "timestamp": "2026-10-31T16:21:00+05:30",
+          "channel": "mobile",
+          "status": "completed",
+          "device_id": "DEV-9001",
+          "ip_country": "RO"
+        },
+        "tool_call_id": "call_1",
+        "collected_at": "2026-10-31T16:22:01+05:30"
+      },
+      {
+        "id": "EV-2",
+        "investigation_id": "INV-1",
+        "kind": "account",
+        "source_ref": "ACC-10042",
+        "data": {
+          "account_id": "ACC-10042",
+          "opened_at": "2023-09-14",
+          "median_outgoing_30d": 4200.0
+        },
+        "tool_call_id": "call_2",
+        "collected_at": "2026-10-31T16:22:02+05:30"
+      },
+      {
+        "id": "EV-3",
+        "investigation_id": "INV-1",
+        "kind": "account_event",
+        "source_ref": "ACC-10042/sim_swap",
+        "data": {
+          "type": "sim_swap",
+          "at": "2026-10-31T15:02:00+05:30",
+          "details": "SIM replaced"
+        },
+        "tool_call_id": "call_3",
+        "collected_at": "2026-10-31T16:22:03+05:30"
+      },
+      {
+        "id": "EV-4",
+        "investigation_id": "INV-1",
+        "kind": "account_event",
+        "source_ref": "ACC-10042/password_reset",
+        "data": {
+          "type": "password_reset",
+          "at": "2026-10-31T15:06:00+05:30",
+          "details": "Reset by SMS"
+        },
+        "tool_call_id": "call_4",
+        "collected_at": "2026-10-31T16:22:04+05:30"
+      },
+      {
+        "id": "EV-5",
+        "investigation_id": "INV-1",
+        "kind": "device",
+        "source_ref": "DEV-9001",
+        "data": {
+          "device_id": "DEV-9001",
+          "first_seen": "2026-10-31T15:09:00+05:30",
+          "ip_country": "RO"
+        },
+        "tool_call_id": "call_5",
+        "collected_at": "2026-10-31T16:22:05+05:30"
+      },
+      {
+        "id": "EV-6",
+        "investigation_id": "INV-1",
+        "kind": "relationship",
+        "source_ref": "BEN-7001",
+        "data": {
+          "beneficiary_id": "BEN-7001",
+          "paying_accounts_7d": 6,
+          "in_scope_accounts": [
+            "ACC-10311",
+            "ACC-10388",
+            "ACC-10455"
+          ],
+          "out_of_scope_count": 3,
+          "derived_from": [
+            "TXN-48810",
+            "TXN-48972",
+            "TXN-49120"
+          ]
+        },
+        "tool_call_id": "call_6",
+        "collected_at": "2026-10-31T16:22:06+05:30"
+      }
+    ],
+    "follow_ups": [
+      {
+        "id": "FUP-1",
+        "question": "Which other accounts paid this beneficiary?",
+        "answer": "ACC-10311, ACC-10388 and ACC-10455 paid BEN-7001. 3 more are outside your Portfolio.",
+        "evidence_ids": [
+          "EV-6"
+        ],
+        "verification": "verified",
+        "asked_at": "2026-10-31T16:24:00+05:30"
+      }
+    ],
+    "trace_url": "https://us.cloud.langfuse.com/project/example/traces/example",
+    "is_replay": false,
+    "replay_captured_at": null
+  },
+  "steps": [
+    {
+      "seq": 1,
+      "stage": "triage",
+      "type": "stage_started",
+      "summary": "Triage started",
+      "evidence_ids": [],
+      "at": "2026-10-31T16:22:00+05:30"
+    },
+    {
+      "seq": 2,
+      "stage": "triage",
+      "type": "stage_finished",
+      "summary": "Payment on ACC-10042 needs Evidence",
+      "evidence_ids": [],
+      "at": "2026-10-31T16:22:01+05:30"
+    },
+    {
+      "seq": 3,
+      "stage": "evidence",
+      "type": "stage_started",
+      "summary": "Gathering Evidence",
+      "evidence_ids": [],
+      "at": "2026-10-31T16:22:01+05:30"
+    },
+    {
+      "seq": 4,
+      "stage": "evidence",
+      "type": "tool_call",
+      "summary": "get_transactions(ACC-10042)",
+      "evidence_ids": [],
+      "at": "2026-10-31T16:22:01+05:30"
+    },
+    {
+      "seq": 5,
+      "stage": "evidence",
+      "type": "tool_result",
+      "summary": "Payment and account history",
+      "evidence_ids": [
+        "EV-1",
+        "EV-2"
+      ],
+      "at": "2026-10-31T16:22:02+05:30"
+    },
+    {
+      "seq": 6,
+      "stage": "evidence",
+      "type": "tool_call",
+      "summary": "get_account_events(ACC-10042)",
+      "evidence_ids": [],
+      "at": "2026-10-31T16:22:02+05:30"
+    },
+    {
+      "seq": 7,
+      "stage": "evidence",
+      "type": "tool_result",
+      "summary": "SIM swap and password reset found",
+      "evidence_ids": [
+        "EV-3",
+        "EV-4"
+      ],
+      "at": "2026-10-31T16:22:03+05:30"
+    },
+    {
+      "seq": 8,
+      "stage": "evidence",
+      "type": "tool_call",
+      "summary": "get_device(DEV-9001)",
+      "evidence_ids": [],
+      "at": "2026-10-31T16:22:03+05:30"
+    },
+    {
+      "seq": 9,
+      "stage": "evidence",
+      "type": "tool_result",
+      "summary": "Device first seen today",
+      "evidence_ids": [
+        "EV-5"
+      ],
+      "at": "2026-10-31T16:22:04+05:30"
+    },
+    {
+      "seq": 10,
+      "stage": "evidence",
+      "type": "tool_call",
+      "summary": "analyze_relationships(BEN-7001)",
+      "evidence_ids": [],
+      "at": "2026-10-31T16:22:04+05:30"
+    },
+    {
+      "seq": 11,
+      "stage": "evidence",
+      "type": "tool_result",
+      "summary": "6 accounts paid this beneficiary",
+      "evidence_ids": [
+        "EV-6"
+      ],
+      "at": "2026-10-31T16:22:05+05:30"
+    },
+    {
+      "seq": 12,
+      "stage": "evidence",
+      "type": "stage_finished",
+      "summary": "6 Evidence records gathered",
+      "evidence_ids": [],
+      "at": "2026-10-31T16:22:05+05:30"
+    },
+    {
+      "seq": 13,
+      "stage": "synthesis",
+      "type": "stage_started",
+      "summary": "Drafting the report",
+      "evidence_ids": [],
+      "at": "2026-10-31T16:22:05+05:30"
+    },
+    {
+      "seq": 14,
+      "stage": "synthesis",
+      "type": "stage_finished",
+      "summary": "Draft ready",
+      "evidence_ids": [],
+      "at": "2026-10-31T16:22:07+05:30"
+    },
+    {
+      "seq": 15,
+      "stage": "verification",
+      "type": "verification",
+      "summary": "All claims match their Evidence",
+      "evidence_ids": [],
+      "at": "2026-10-31T16:22:07+05:30"
+    },
+    {
+      "seq": 16,
+      "stage": "report",
+      "type": "stage_finished",
+      "summary": "Report saved",
+      "evidence_ids": [],
+      "at": "2026-10-31T16:22:08+05:30"
+    }
+  ]
+}
