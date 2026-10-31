@@ -1,23 +1,15 @@
 import { useEffect, useState } from 'react'
-import { api, chooseAnalyst, currentAnalyst, type Analyst } from './api'
+import { api, clearSession, currentAnalyst, currentPassword, type Analyst } from './api'
 import { Button } from './ui'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import CasePage from './pages/CasePage'
 import Cases from './pages/Cases'
 import Dashboard from './pages/Dashboard'
 import Evaluations from './pages/Evaluations'
 import Governance from './pages/Governance'
 import Upload from './pages/Upload'
+import Login from './pages/Login'
 
 const NAV = [
   ['upload', 'Upload'],
@@ -49,6 +41,7 @@ export default function App() {
   const [section = 'dashboard', id] = useRoute()
   const [analysts, setAnalysts] = useState<Analyst[]>([])
   const [analyst, setAnalyst] = useState(currentAnalyst())
+  const [authed, setAuthed] = useState(!!currentPassword())
   const [version, setVersion] = useState(0)
 
   useEffect(() => {
@@ -57,6 +50,14 @@ export default function App() {
 
   const refresh = () => setVersion((v) => v + 1)
   const page = section || 'dashboard'
+
+  if (!authed) {
+    return (
+      <TooltipProvider>
+        <Login onLogin={() => { setAnalyst(currentAnalyst()); setAuthed(true); refresh() }} />
+      </TooltipProvider>
+    )
+  }
 
   return (
     <TooltipProvider>
@@ -76,37 +77,12 @@ export default function App() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-slate-100">
-                <Avatar size="sm">
-                  <AvatarImage src={avatarUrl(analyst)} alt={analysts.find((a) => a.id === analyst)?.name ?? analyst} />
-                  <AvatarFallback>{initials(analysts.find((a) => a.id === analyst)?.name ?? analyst)}</AvatarFallback>
-                </Avatar>
-                <span className="hidden sm:inline">{analysts.find((a) => a.id === analyst)?.name ?? analyst}</span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>Change analyst</DropdownMenuLabel>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                {analysts.map((a) => (
-                  <DropdownMenuItem
-                    key={a.id}
-                    onClick={() => {
-                      chooseAnalyst(a.id)
-                      setAnalyst(a.id)
-                      refresh()
-                    }}
-                  >
-                    <Avatar size="sm">
-                      <AvatarImage src={avatarUrl(a.id)} alt={a.name} />
-                      <AvatarFallback>{initials(a.name)}</AvatarFallback>
-                    </Avatar>
-                    {a.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Avatar size="sm">
+              <AvatarImage src={avatarUrl(analyst)} alt={analysts.find((a) => a.id === analyst)?.name ?? analyst} />
+              <AvatarFallback>{initials(analysts.find((a) => a.id === analyst)?.name ?? analyst)}</AvatarFallback>
+            </Avatar>
+            <span className="hidden sm:inline text-sm">{analysts.find((a) => a.id === analyst)?.name ?? analyst}</span>
+            <Button onClick={() => { clearSession(); setAuthed(false); refresh() }}>Log out</Button>
             <Button onClick={() => api.reset().then(refresh)}>Reset demo</Button>
           </div>
         </div>

@@ -107,6 +107,14 @@ def analysts():
     return store.analysts()
 
 
+@app.get("/me", response_model=Analyst)
+def me(scope: AnalystScope = Depends(current_scope)):
+    analyst = store.analyst(scope.analyst_id)
+    if analyst is None:
+        raise HTTPException(404, "Analyst not found.")
+    return analyst
+
+
 @app.get("/users")
 def users():
     return store.users()

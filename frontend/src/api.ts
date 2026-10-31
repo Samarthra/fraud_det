@@ -75,6 +75,7 @@ export class ApiError extends Error {
 }
 
 const KEY = 'fraudlens-analyst'
+const PWD = 'fraudlens-password'
 
 export function currentAnalyst(): string {
   try {
@@ -84,23 +85,47 @@ export function currentAnalyst(): string {
   }
 }
 
-export function chooseAnalyst(id: string) {
+export function currentPassword(): string | null {
+  try {
+    return localStorage.getItem(PWD)
+  } catch {
+    return null
+  }
+}
+
+export function chooseAnalyst(id: string, password?: string | null) {
   try {
     localStorage.setItem(KEY, id)
+    if (password) localStorage.setItem(PWD, password)
   } catch {
     // The picker still works for this page load.
   }
   analyst = id
+  if (password) passwordState = password
+}
+
+export function clearSession() {
+  try {
+    localStorage.removeItem(KEY)
+    localStorage.removeItem(PWD)
+  } catch {
+    // ignore
+  }
+  passwordState = null
 }
 
 let analyst = currentAnalyst()
+let passwordState: string | null = currentPassword()
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { 'X-Analyst-Id': analyst }
-  try {
-    headers['Authorization'] = `Basic ${btoa(`${analyst}:password`)}`
-  } catch {
-    // ignore
+  const pwd = passwordState ?? currentPassword()
+  if (pwd) {
+    try {
+      headers['Authorization'] = `Basic ${btoa(`${analyst}:${pwd}`)}`
+    } catch {
+      // ignore
+    }
   }
   if (init.body && !(init.body instanceof FormData)) headers['Content-Type'] = 'application/json'
   const response = await fetch(`/api${path}`, { ...init, headers })
@@ -116,6 +141,17 @@ const post = <T,>(path: string, body?: unknown) =>
 
 export const api = {
   analysts: () => request<Analyst[]>('/analysts'),
+  me: () => request<Analyst>('/me'),
+  login: async (username: string, password: string) => {
+    const token = btoa(`${username}:${password}`)
+    const response = await fetch('/api/me', { headers: { Authorization: `Basic ${token}` } })
+    if (!response.ok) throw new ApiError(response.status, 'Invalid credentials')
+    const a = await response.json() as Analyst
+    chooseAnalyst(a.id, password)
+    analyst = a.id
+    passwordState = password
+    return a
+  },
   stats: () => request<Stats>('/stats'),
   alerts: (filters: Record<string, string>) => {
     const set = Object.entries(filters).filter(([, value]) => value)
