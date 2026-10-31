@@ -153,6 +153,7 @@ export const api = {
     return a
   },
   stats: () => request<Stats>('/stats'),
+  graph: () => request<{ nodes: {id:string;type:string;label:string}[]; edges: {source:string;target:string;label:string}[] }>('/graph'),
   alerts: (filters: Record<string, string>) => {
     const set = Object.entries(filters).filter(([, value]) => value)
     return request<Alert[]>(`/alerts?${new URLSearchParams(set)}`)

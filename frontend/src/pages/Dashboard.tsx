@@ -7,6 +7,7 @@ const TYPES = [
   'account_takeover', 'suspicious_transfer', 'shared_device', 'repeated_login_failures', 'suspicious_loan_application',
   'new_device', 'amount_spike', 'new_beneficiary', 'mule_beneficiary', 'velocity', 'foreign_ip', 'off_hours',
 ]
+const PAGE_SIZE = 10
 
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null)
@@ -15,22 +16,49 @@ export default function Dashboard() {
   const [selected, setSelected] = useState<Alert | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [rerun, setRerun] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [graph, setGraph] = useState<{ nodes: { id: string; type: string }[]; edges: { source: string; target: string }[] } | null>(null)
 
   useEffect(() => {
     api.stats().then(setStats).catch((e) => setError(e.message))
   }, [rerun])
 
   useEffect(() => {
-    api.alerts(filters).then(setAlerts).catch((e) => setError(e.message))
+    api.alerts(filters).then((rows) => { setAlerts(rows); setPage(1) }).catch((e) => setError(e.message))
   }, [filters, rerun])
+
+  useEffect(() => {
+    api.graph().then(setGraph).catch(() => setGraph(null))
+  }, [rerun])
 
   const set = (key: keyof typeof EMPTY) => (e: { target: { value: string } }) =>
     setFilters((f) => ({ ...f, [key]: e.target.value }))
 
+  const totalPages = Math.max(1, Math.ceil(alerts.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const pageRows = alerts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  const nodeColor = (type: string) => {
+    if (type === 'account') return '#0f172a'
+    if (type === 'device') return '#2563eb'
+    if (type === 'beneficiary') return '#dc2626'
+    return '#64748b'
+  }
+
+  const graphNodes = graph?.nodes ?? []
+  const radius = 150
+  const cx = 260
+  const cy = 180
+  const positioned = graphNodes.map((n, i) => {
+    const angle = (i / Math.max(1, graphNodes.length)) * Math.PI * 2
+    return { ...n, x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) }
+  })
+  const nodeMap = new Map(positioned.map((n) => [n.id, n]))
+
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Dashboard</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <div className="flex items-center gap-3">
           {rerun && <span className="text-sm text-slate-600">{rerun}</span>}
           <Button onClick={() => api.rerun().then((r) => setRerun(`Detection re-run: ${r.alerts_created} new Alerts`))}>Re-run detection</Button>
@@ -38,26 +66,61 @@ export default function Dashboard() {
       </div>
       <ErrorNote message={error} />
       {stats && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Stat label="Records processed" value={stats.records_processed.toLocaleString('en-IN')} tooltip="Total records processed by detection." />
           <Stat label="Flagged events" value={stats.flagged_events} tooltip="Events flagged as suspicious." />
-          <Card title="Risk distribution" tooltip="Counts of Alerts by risk level.">
-            <div className="space-y-1 text-sm">
+          <Card title="Risk distribution" tooltip="Counts of Alerts by risk level." className="sm:col-span-1">
+            <div className="space-y-2 text-sm">
               {(['high', 'medium', 'low'] as const).map((level) => (
-                <div key={level} className="flex justify-between"><Risk level={level} /><span className="tabular-nums">{stats.risk_distribution[level] ?? 0}</span></div>
+                <div key={level} className="flex items-center justify-between">
+                  <Risk level={level} />
+                  <span className="tabular-nums font-medium">{stats.risk_distribution[level] ?? 0}</span>
+                </div>
               ))}
             </div>
           </Card>
           <Card title="Fraud categories" tooltip="Alerts grouped by detection category.">
-            <div className="space-y-1 text-sm">
+            <div className="space-y-2 text-sm">
               {Object.entries(stats.fraud_categories).map(([name, count]) => (
-                <div key={name} className="flex justify-between gap-2"><span>{label(name)}</span><span className="tabular-nums">{count}</span></div>
+                <div key={name} className="flex items-center justify-between gap-2">
+                  <span className="text-slate-600">{label(name)}</span>
+                  <span className="tabular-nums font-medium">{count}</span>
+                </div>
               ))}
             </div>
           </Card>
         </div>
       )}
-      <Card title={`Alerts (${alerts.length})`} tooltip="Alerts created by detection; click a row for details.">
+      <Card title="Relationship graph" tooltip="Accounts, devices and beneficiaries connected by transactions.">
+        <div className="overflow-x-auto">
+          <svg viewBox="0 0 520 360" className="h-72 w-full min-w-[520px]">
+            {graph?.edges.map((e, i) => {
+              const a = nodeMap.get(e.source)
+              const b = nodeMap.get(e.target)
+              if (!a || !b) return null
+              return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#cbd5e1" strokeWidth="1.5" />
+            })}
+            {positioned.map((n) => (
+              <g key={n.id}>
+                <circle cx={n.x} cy={n.y} r="7" fill={nodeColor(n.type)} />
+                <text x={n.x + 9} y={n.y + 4} fontSize="9" fill="#475569">{n.id}</text>
+              </g>
+            ))}
+          </svg>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
+          <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-slate-900" />Account</span>
+          <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-blue-600" />Device</span>
+          <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-red-600" />Beneficiary</span>
+        </div>
+      </Card>
+      <Card title={`Alerts (${alerts.length})`} tooltip="Alerts created by detection; click a row for details." action={
+        <div className="flex items-center gap-2 text-sm text-slate-500">
+          <span>Page {currentPage} of {totalPages}</span>
+          <Button disabled={currentPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Prev</Button>
+          <Button disabled={currentPage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Next</Button>
+        </div>
+      }>
         <div className="mb-3 flex flex-wrap gap-2">
           <input aria-label="Customer" placeholder="Customer" className={inputClass} value={filters.customer} onChange={set('customer')} />
           <input aria-label="Transaction" placeholder="Transaction" className={inputClass} value={filters.transaction} onChange={set('transaction')} />
@@ -81,7 +144,7 @@ export default function Dashboard() {
               <tr><th className="py-1 pr-3">Alert</th><th className="pr-3">Risk</th><th className="pr-3">Score</th><th className="pr-3">Category</th><th className="pr-3">Customer</th><th className="pr-3">Subject</th><th>Time</th></tr>
             </thead>
             <tbody>
-              {alerts.slice(0, 100).map((a) => (
+              {pageRows.map((a) => (
                 <tr key={a.id} onClick={() => setSelected(a)} className={`cursor-pointer border-t border-slate-100 hover:bg-slate-50 ${selected?.id === a.id ? 'bg-blue-50' : ''}`}>
                   <td className="py-1.5 pr-3">{a.id}</td>
                   <td className="pr-3"><Risk level={a.risk_level} /></td>
@@ -95,13 +158,12 @@ export default function Dashboard() {
             </tbody>
           </table>
           {alerts.length === 0 && <p className="py-4 text-sm text-slate-600">No Alerts match. Load sample data on the Upload page if this is a fresh start.</p>}
-          {alerts.length > 100 && <p className="pt-2 text-sm text-slate-600">Showing the first 100. Use the filters to narrow this down.</p>}
         </div>
       </Card>
       {selected && (
         <Card
           title={`${selected.id}: why it was flagged`}
-          tooltip="Rule hits and supporting records for this Alert." 
+          tooltip="Rule hits and supporting records for this Alert."
           action={selected.case_id ? <a className="text-sm text-blue-700 underline" href={`#/cases/${selected.case_id}`}>Open {selected.case_id}</a> : <span className="text-sm text-slate-500">Below the actionable threshold, so no Case</span>}
         >
           <ul className="space-y-1 text-sm">

@@ -209,6 +209,50 @@ class Store:
         }
 
     # Query helpers used by tools
+    def relationship_graph(self, portfolio: str) -> dict[str, Any]:
+        accounts = [r["account_id"] for r in self._all(
+            "SELECT account_id FROM accounts WHERE portfolio=?", portfolio)]
+        account_set = set(accounts)
+        nodes: dict[str, dict[str, Any]] = {}
+        edges: list[dict[str, str]] = []
+        edge_keys: set[tuple[str, str, str]] = set()
+        def node(nid, ntype, label=None):
+            if nid not in nodes:
+                nodes[nid] = {"id": nid, "type": ntype, "label": label or nid}
+        for aid in accounts:
+            node(aid, "account")
+        for r in self._all(
+            "SELECT account_id, device_id, beneficiary_id FROM transactions"):
+            aid = r["account_id"]
+            if aid not in account_set:
+                continue
+            if r["device_id"]:
+                did = r["device_id"]
+                node(did, "device")
+                key = (aid, did, "device")
+                if key not in edge_keys:
+                    edge_keys.add(key)
+                    edges.append({"source": aid, "target": did, "label": "uses"})
+            if r["beneficiary_id"]:
+                bid = r["beneficiary_id"]
+                node(bid, "beneficiary")
+                key = (aid, bid, "beneficiary")
+                if key not in edge_keys:
+                    edge_keys.add(key)
+                    edges.append({"source": aid, "target": bid, "label": "pays"})
+        for r in self._all("SELECT account_id, device_id FROM logins"):
+            aid = r["account_id"]
+            if aid not in account_set:
+                continue
+            if r["device_id"]:
+                did = r["device_id"]
+                node(did, "device")
+                key = (aid, did, "device")
+                if key not in edge_keys:
+                    edge_keys.add(key)
+                    edges.append({"source": aid, "target": did, "label": "login"})
+        return {"nodes": list(nodes.values()), "edges": edges}
+
     def account_portfolio(self, account_id: str) -> str | None:
         row = self._one("SELECT portfolio FROM accounts WHERE account_id=?", account_id)
         return row["portfolio"] if row else None

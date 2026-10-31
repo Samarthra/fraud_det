@@ -191,6 +191,10 @@ def rerun(scope: AnalystScope = Depends(current_scope)):
 def stats(scope: AnalystScope = Depends(current_scope)):
     return store.stats(scope.portfolio)
 
+@app.get("/graph")
+def graph(scope: AnalystScope = Depends(current_scope)):
+    return store.relationship_graph(scope.portfolio)
+
 
 @app.get("/alerts", response_model=list[Alert])
 def alerts(
