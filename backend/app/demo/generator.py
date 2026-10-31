@@ -20,6 +20,8 @@ class Sample:
     logins: list[dict[str, Any]] = field(default_factory=list)
     loan_applications: list[dict[str, Any]] = field(default_factory=list)
     account_events: list[dict[str, Any]] = field(default_factory=list)
+    policies: list[dict[str, Any]] = field(default_factory=list)
+    claims: list[dict[str, Any]] = field(default_factory=list)
     ground_truth: list[dict[str, Any]] = field(default_factory=list)
 
 
@@ -31,6 +33,8 @@ class Builder:
         self.txn = 10000
         self.login = 10000
         self.loan = 1000
+        self.policy_no = 2000
+        self.claim_no = 2000
 
     def at(self, days_ago: float, minutes: float = 0) -> str:
         return (self.now - timedelta(days=days_ago, minutes=minutes)).isoformat(timespec="seconds")
@@ -80,17 +84,44 @@ class Builder:
             "timestamp": timestamp, "outcome": outcome,
         })
 
-    def apply(self, customer_id, device, amount, timestamp, story, fraud):
-        self.loan += 1
-        application_id = f"APP-{self.loan}"
+    def apply(self, customer_id, device, amount, timestamp, story, fraud, *, application_id=None,
+              status="submitted", ip=None, phone=None, disbursed_account_id=None, disbursed_at=None):
+        if application_id is None:
+            self.loan += 1
+            application_id = f"APP-{self.loan}"
         self.s.loan_applications.append({
             "application_id": application_id, "customer_id": customer_id, "device_id": device,
-            "amount": amount, "status": "submitted", "timestamp": timestamp,
+            "amount": amount, "status": status, "timestamp": timestamp, "ip": ip, "phone": phone,
+            "disbursed_account_id": disbursed_account_id, "disbursed_at": disbursed_at,
         })
         self.label(application_id, fraud, story)
 
+    def policy(self, customer_id, start_date, sum_assured, *, product="Term life", policy_id=None):
+        if policy_id is None:
+            self.policy_no += 1
+            policy_id = f"POL-{self.policy_no}"
+        self.s.policies.append({
+            "policy_id": policy_id, "customer_id": customer_id, "product": product,
+            "sum_assured": sum_assured, "start_date": start_date, "status": "active",
+        })
+        return policy_id
+
+    def claim(self, policy_id, customer_id, amount, timestamp, story, fraud, *, device=None, ip=None,
+              phone=None, claim_id=None):
+        if claim_id is None:
+            self.claim_no += 1
+            claim_id = f"CLM-{self.claim_no}"
+        self.s.claims.append({
+            "claim_id": claim_id, "policy_id": policy_id, "customer_id": customer_id, "amount": amount,
+            "status": "submitted", "timestamp": timestamp, "device_id": device, "ip": ip, "phone": phone,
+        })
+        self.label(claim_id, fraud, story)
+
     def event(self, account_id, kind, at, details):
-        self.s.account_events.append({"account_id": account_id, "type": kind, "at": at, "details": details})
+        self.s.account_events.append({
+            "event_id": f"EVT-{len(self.s.account_events) + 1}", "account_id": account_id,
+            "type": kind, "at": at, "details": details,
+        })
 
     def label(self, subject_id, is_fraud, story):
         self.s.ground_truth.append({"subject_id": subject_id, "is_fraud": is_fraud, "story": story})
@@ -258,6 +289,70 @@ def scenarios(b: Builder) -> None:
           description="Rent deposit, new flat", story="new_landlord", txn_id="TXN-50002")
 
 
+def insurance(b: Builder, accounts) -> None:
+    """Runs after every older story, so their seeded data stays exactly as it was."""
+    r = b.r
+    picks = r.sample(accounts, 120)
+    for a in picks[:90]:  # ordinary policies, some with ordinary claims
+        policy = b.policy(a["customer_id"], b.at(r.uniform(120, 900)), r.choice([300000, 500000, 1000000]))
+        if r.random() < 0.3:
+            b.claim(policy, a["customer_id"], r.choice([20000, 45000, 80000]), b.daytime(r.uniform(1, 45)),
+                    "normal_claim", False, device=a["device"])
+    for a in picks[90:96]:  # a genuine claim soon after buying cover, the look-alike
+        policy = b.policy(a["customer_id"], b.at(r.uniform(12, 25)), 500000)
+        b.claim(policy, a["customer_id"], 60000, b.daytime(r.uniform(1, 6)), "early_genuine_claim", False,
+                device=a["device"])
+    family = [c for c in b.s.customers if c["account_id"].startswith("ACC-4000")]
+    for a in family[:2]:  # one household claiming from one phone
+        policy = b.policy(a["customer_id"], b.at(300), 300000)
+        b.claim(policy, a["customer_id"], 25000, b.daytime(r.uniform(1, 6)), "family_claim", False,
+                device=a["device"])
+    for n in range(2):  # unrelated customers claiming from one device
+        device = f"DEV-CLAIM{n}"
+        for a in picks[96 + n * 3:99 + n * 3]:
+            policy = b.policy(a["customer_id"], b.at(r.uniform(10, 25)), 800000)
+            b.claim(policy, a["customer_id"], 350000, b.daytime(r.uniform(1, 6)), "staged_claim_ring", True,
+                    device=device)
+
+
+RING_DEVICE = "DEV-9003"
+RING_IP = "203.0.113.77"
+
+
+def linked_scenario(b: Builder) -> None:
+    """One fraud across lending, core banking and insurance, joined by real identifiers."""
+    applicant = b.account("ACC-10077", "CUS-10770", "Neel Rathi", "Nagpur", "portfolio-1", years=4)
+    applicant["device"] = "DEV-1077"
+    for i in range(30):
+        b.pay(applicant, "BEN-1400", "Grocer", b.r.uniform(4000, 7000), b.daytime(2 + i * 1.9), "DEV-1077",
+              description="Groceries")
+    b.sign_in(applicant, "DEV-1077", b.daytime(3))
+    ring = [
+        b.account("ACC-10078", "CUS-10780", "Ira Sood", "Nagpur", "portfolio-1", years=2),
+        b.account("ACC-10079", "CUS-10790", "Om Kapoor", "Indore", "portfolio-1", years=2),
+        b.account("ACC-60010", "CUS-60100", "Ria Dutta", "Bhopal", "portfolio-2", years=2),
+    ]
+    for n, a in enumerate(ring):
+        a["device"] = f"DEV-108{n}"
+        for i in range(6):
+            b.pay(a, "BEN-1500", "Grocer", b.r.uniform(1500, 3000), b.daytime(2 + i * 4), a["device"],
+                  description="Groceries")
+        b.sign_in(a, RING_DEVICE, b.at(3, 30 + n * 20), ip=RING_IP)
+        b.apply(a["customer_id"], RING_DEVICE, 400000, b.at(3, 20 + n * 20), "multi_applicant_ring", True,
+                application_id=f"APP-900{n + 2}", ip=RING_IP, phone=applicant["phone"])
+    b.sign_in(applicant, RING_DEVICE, b.at(1, 200), ip=RING_IP)
+    b.apply(applicant["customer_id"], RING_DEVICE, 600000, b.at(3), "multi_applicant_ring", True,
+            application_id="APP-9001", status="disbursed", ip=RING_IP, phone=applicant["phone"],
+            disbursed_account_id="ACC-10077", disbursed_at=b.at(0, 600))
+    b.event("ACC-10077", "bank_account_changed", b.at(1), "Disbursement account changed to ACC-10077 on the mobile app")
+    b.pay(applicant, "BEN-7003", "Zenith Exim", 575000.0, b.at(0, 420), RING_DEVICE,
+          description="Payment", story="loan_proceeds_diversion", fraud=True, txn_id="TXN-50003")
+
+    policy = b.policy("CUS-10780", b.at(20), 800000, policy_id="POL-9001")
+    b.claim(policy, "CUS-10780", 400000.0, b.at(2), "staged_claim_ring", True, device=RING_DEVICE,
+            ip=RING_IP, phone=applicant["phone"], claim_id="CLM-9001")
+
+
 def generate(now: datetime | None = None) -> Sample:
     b = Builder((now or datetime.now(IST)).astimezone(IST))
     accounts = population(b)
@@ -266,4 +361,6 @@ def generate(now: datetime | None = None) -> Sample:
     fraud_stories(b, accounts)
     loans(b, accounts)
     scenarios(b)
+    insurance(b, accounts)
+    linked_scenario(b)
     return b.s

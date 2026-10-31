@@ -7,6 +7,7 @@
       "account_id": "ACC-10042",
       "category": "account_takeover",
       "risk_level": "high",
+      "original_risk_level": null,
       "supporting_records": [
         {
           "kind": "transaction",
@@ -31,10 +32,15 @@
           "decision": "requires_investigation",
           "analyst": "analyst-1",
           "note": "High-risk transfer after a new device",
-          "at": "2026-10-31T16:21:40+05:30"
+          "at": "2026-10-31T16:21:40+05:30",
+          "escalate_to": null
         }
       ],
-      "investigation_id": "INV-1"
+      "investigation_id": "INV-1",
+      "alert_ids": [],
+      "products": [],
+      "priority": null,
+      "merged_into": null
     },
     "alert": {
       "id": "ALT-12",
@@ -80,6 +86,8 @@
       "transaction_id": "TXN-50001",
       "device_id": "DEV-9001",
       "application_id": null,
+      "policy_id": null,
+      "claim_id": null,
       "supporting_records": [
         {
           "kind": "transaction",
@@ -100,6 +108,14 @@
       ],
       "created_at": "2026-10-31T16:21:00+05:30"
     },
+    "alerts": [],
+    "reasons": [],
+    "links": [],
+    "notes": [],
+    "classifications": [],
+    "timeline": [],
+    "graph": null,
+    "history": [],
     "report": {
       "assessment": "suspicious",
       "summary": "ACC-10042 shows the pattern of an account takeover ending in a large transfer to a likely mule.",

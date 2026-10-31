@@ -1,15 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError, api, type CaseDetail, type DecisionValue } from '../api'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ApiError, api, type CaseDetail, type DecisionValue, type EscalationTarget, type RiskLevel } from '../api'
 import ActivityPanel from '../components/case/ActivityPanel'
 import AlertTab from '../components/case/AlertTab'
+import CaseGraph from '../components/case/CaseGraph'
 import DecisionDrawer from '../components/case/DecisionDrawer'
 import EvidenceTab from '../components/case/EvidenceTab'
+import HistoryTab from '../components/case/HistoryTab'
+import OverviewTab from '../components/case/OverviewTab'
 import ReportTab from '../components/case/ReportTab'
+import TimelineTab from '../components/case/TimelineTab'
 import { useSteps } from '../components/case/useSteps'
-import EntityGraph from '../components/EntityGraph'
-import { Badge, Button, ErrorNote, Risk, label, when } from '../ui'
+import { Badge, Button, ErrorNote, PriorityBadge, Risk, label, money, when } from '../ui'
 
-type Tab = 'report' | 'evidence' | 'graph' | 'alert'
+type Tab = 'overview' | 'timeline' | 'graph' | 'report' | 'evidence' | 'alerts' | 'history'
 
 export default function CasePage({ id }: { id: string }) {
   const [detail, setDetail] = useState<CaseDetail | null>(null)
@@ -17,7 +20,7 @@ export default function CasePage({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null)
   const [denied, setDenied] = useState(false)
   const [tick, setTick] = useState(0)
-  const [tab, setTab] = useState<Tab>('alert')
+  const [tab, setTab] = useState<Tab>('overview')
   const [openEvidence, setOpenEvidence] = useState<string | null>(null)
   const [drawer, setDrawer] = useState(false)
   const chosenTab = useRef(false)
@@ -26,6 +29,11 @@ export default function CasePage({ id }: { id: string }) {
   const load = useCallback(() => {
     api.caseDetail(id)
       .then((d) => {
+        // Alerts keep their original Case, so an old link can land on one that was consolidated.
+        if (d.case.merged_into) {
+          window.location.hash = `#/cases/${d.case.merged_into}`
+          return
+        }
         setDetail(d)
         setInvestigationId(d.case.investigation_id ?? null)
       })
@@ -68,11 +76,31 @@ export default function CasePage({ id }: { id: string }) {
     pick('evidence')
   }
 
-  async function decide(decision: DecisionValue, note: string) {
-    await api.decide(id, decision, note)
+  async function decide(decision: DecisionValue, note: string, escalateTo?: EscalationTarget) {
+    await api.decide(id, decision, note, escalateTo)
     load()
     refresh()
   }
+
+  async function reclassify(level: RiskLevel, reason: string) {
+    await api.reclassify(id, level, reason)
+    load()
+  }
+
+  async function separate(alertId: string, reason: string) {
+    await api.separate(id, alertId, reason)
+    load()
+  }
+
+  async function addNote(text: string) {
+    await api.addNote(id, text)
+    load()
+  }
+
+  const linkIds = useMemo(() => {
+    const shared = detail?.reasons?.filter((r) => !['account', 'customer'].includes(r.kind)) ?? []
+    return new Set(shared.map((r) => r.value))
+  }, [detail])
 
   if (denied) return <ErrorNote message={`${id} is outside this Analyst's Portfolio. This attempt has been audited.`} />
   if (!detail) return <ErrorNote message={error} />
@@ -82,11 +110,16 @@ export default function CasePage({ id }: { id: string }) {
   const replay = Boolean(investigation?.is_replay)
   const current = item.decisions.length ? item.decisions[item.decisions.length - 1] : null
   const evidence = investigation?.evidence ?? []
+  const alerts = detail.alerts?.length ? detail.alerts : [alert]
+  const priority = item.priority
   const TABS: [Tab, string][] = [
-    ['report', running ? 'Report (drafting)' : 'Report'],
+    ['overview', 'Overview'],
+    ['timeline', 'Timeline'],
+    ['graph', 'Network'],
+    ['report', running ? 'AI report (drafting)' : 'AI report'],
     ['evidence', `Evidence (${evidence.length})`],
-    ['graph', 'Graph'],
-    ['alert', 'Alert'],
+    ['alerts', `Alerts (${alerts.length})`],
+    ['history', `Notes and history (${detail.history?.length ?? 0})`],
   ]
 
   return (
@@ -98,14 +131,18 @@ export default function CasePage({ id }: { id: string }) {
       )}
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5">
         <h1 className="text-lg font-semibold">{item.id}</h1>
-        <Risk level={item.risk_level} />
-        <Badge>{label(running ? 'investigating' : item.status)}</Badge>
+        {priority && <PriorityBadge band={priority.band} named />}
+        <Risk level={item.risk_level} named />
+        <Badge>Status: {label(running ? 'investigating' : item.status)}</Badge>
         {replay && <Badge tone="amber">Replay</Badge>}
         <span className="text-sm text-slate-600">{label(item.category)} on {item.account_id}, customer {item.customer_id}</span>
+        {priority && priority.exposure > 0 && <span className="text-sm text-slate-600">{money(priority.exposure)} exposed</span>}
+        {(item.products?.length ?? 0) > 1 && <Badge tone="blue">{item.products!.length} systems</Badge>}
         <div className="ml-auto flex items-center gap-3">
           <span className="text-sm text-slate-600">
             Decision: <strong className="text-slate-900">{current ? label(current.decision) : 'None yet'}</strong>
           </span>
+          <Button onClick={() => act(() => api.downloadReport(id))}>Download report</Button>
           <Button primary onClick={() => setDrawer(true)}>Record Decision</Button>
         </div>
       </header>
@@ -146,6 +183,8 @@ export default function CasePage({ id }: { id: string }) {
             ))}
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            {tab === 'overview' && <OverviewTab detail={detail} onReclassify={reclassify} onSeparate={separate} />}
+            {tab === 'timeline' && <TimelineTab events={detail.timeline ?? []} />}
             {tab === 'report' && (
               <ReportTab
                 report={report}
@@ -162,8 +201,9 @@ export default function CasePage({ id }: { id: string }) {
                 onBack={report ? () => pick('report') : undefined}
               />
             )}
-            {tab === 'graph' && <EntityGraph key={alert.id} alert={alert} />}
-            {tab === 'alert' && <AlertTab alert={alert} records={item.supporting_records} />}
+            {tab === 'graph' && detail.graph && <CaseGraph graph={detail.graph} linkIds={linkIds} />}
+            {tab === 'alerts' && <AlertTab alerts={alerts} leadId={item.alert_id} />}
+            {tab === 'history' && <HistoryTab history={detail.history ?? []} notes={detail.notes ?? []} onAddNote={addNote} />}
           </div>
         </section>
       </div>

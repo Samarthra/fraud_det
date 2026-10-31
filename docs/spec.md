@@ -8,7 +8,7 @@ This spec replaces the Hackathon Overview, the Architecture and Flows doc, and t
 
 **Priority order:** Level 1 of the organiser's brief, then a working Investigation with verifiable Evidence, then governance and evals.
 
-**Target:** Level 1 plus a working Investigation. Only Level 1 of the brief has been seen, so any later level needs a fresh check against this spec.
+**Target:** Levels 1 and 2 of the brief plus a working Investigation. Section 12 maps Level 2 to the build. Any later level needs a fresh check against this spec.
 
 The organiser assesses actual application behaviour, so detection must work on uploaded data, not just seeded scenarios.
 
@@ -32,7 +32,7 @@ The organiser assesses actual application behaviour, so detection must work on u
 - Anomaly model, multi-model routing, OpenTelemetry dashboards, external connectors, regulatory workflows.
 - Model comparison and OpenAI. LiteLLM ships as a config file only, is not run, and carries no traffic.
 - PR-AUC and LLM-as-a-judge.
-- Duplicate insurance claims. Suspicious loan applications are the extra Level 1 scenario.
+- Duplicate insurance claims. Suspicious loan applications are the extra Level 1 scenario, and Level 2 adds linked insurance claims instead.
 - Saved Follow-up button in Replay, and the Follow-up tool loop.
 - Compliance claims. The prototype demonstrates controls, not legal compliance or certification.
 
@@ -64,6 +64,7 @@ The organiser assesses actual application behaviour, so detection must work on u
 backend/app/
   contracts.py    Pydantic models: the shared contract
   store.py        SQLite schema, writes, read-only query helpers
+  correlation/    Consolidation, prioritisation, Case workspace builders
   ingest/         Upload parsing and validation
   agent/          LangGraph stages, Verification, prompts
   tools/          Evidence tools
@@ -89,7 +90,7 @@ Neither person writes SQL in the other's area. Tools call Person B's query helpe
 
 ### Ingestion
 
-- `POST /ingest/{dataset}` takes `customers`, `transactions`, `logins` or `loan_applications` as CSV, Excel or JSON, against fixed documented columns. `GET /ingest/templates/{dataset}` downloads a template.
+- `POST /ingest/{dataset}` takes `customers`, `transactions`, `logins`, `loan_applications`, `account_events`, `policies` or `claims` as CSV, Excel or JSON, against fixed documented columns. `GET /ingest/templates/{dataset}` downloads a template.
 - A row can only link to accounts and customers in the uploader's Portfolio, and new accounts land in that Portfolio.
 - Valid rows load. Every invalid row is returned and listed with its row number and reason, such as a missing mandatory field, a bad type, or an unknown linked ID. Nothing is silently dropped.
 - Records link through customer, account, application, device and transaction IDs.
@@ -99,14 +100,14 @@ Neither person writes SQL in the other's area. Tools call Person B's query helpe
 ### Alert
 
 ```text
-{id, case_id, category, product: core_banking|lending, risk_level: low|medium|high,
+{id, case_id, category, product: core_banking|lending|insurance, risk_level: low|medium|high,
  score, rule_hits[{rule, points, reason}], customer_id, account_id, transaction_id?,
- device_id?, application_id?, supporting_records[], created_at}
+ device_id?, application_id?, policy_id?, claim_id?, supporting_records[], created_at}
 ```
 
 - `risk_level`: Low under 50, Medium 50 to 74, High 75 and over.
-- An Alert can come from a transaction, device, login or loan application pattern.
-- An Alert never changes, even when its Case is reclassified.
+- An Alert can come from a transaction, device, login, loan application or insurance claim pattern.
+- An Alert never changes, even when its Case is reclassified or consolidated. `case_id` stays the Case it first opened.
 
 ### Evidence
 
@@ -128,15 +129,18 @@ Evidence belongs to an Investigation. A Case's `supporting_records` come from it
 Every actionable Alert opens a Case immediately, and the Case queue lists them.
 
 ```text
-{id: "CASE-12", alert_id, customer_id, account_id, category, risk_level,
- supporting_records[], status, decisions[{decision, analyst, note, at}],
- investigation_id | null}
+{id: "CASE-12", alert_id, customer_id, account_id, category, risk_level, original_risk_level,
+ supporting_records[], status, decisions[{decision, analyst, note, at, escalate_to?}],
+ investigation_id | null, alert_ids[], products[], priority, merged_into | null}
 ```
 
-- Decisions are `requires_investigation | false_positive | confirmed_fraud | escalated`.
+- `alert_id` is the lead Alert. `alert_ids` is every Alert in the Case now.
+- Decisions are `requires_investigation | false_positive | confirmed_fraud | escalated | information_requested | hold_recommended | verification_recommended | concluded`.
+- `false_positive`, `information_requested`, both recommendations and `concluded` need a note. `escalated` can name `fraud_specialist` or `supervisor`.
 - A Decision can change. The history is append-only, and the latest entry is current.
-- `status` is derived: new, investigating, report ready or decided.
-- An Investigation is optional, and a Case has at most one.
+- `status` is derived: new, investigating, report ready, awaiting information or decided. A recommendation never changes it.
+- An Investigation is optional, and a Case has at most one. It looks into the lead Alert.
+- A Case with `merged_into` set isn't listed and takes no new work (409). The UI forwards to its lead.
 
 ### Investigation report
 
@@ -182,11 +186,16 @@ The UI polls every 500ms and reveals steps at a minimum of about 700ms each, so 
 | `GET /ingest/templates/{dataset}` | Download a template |
 | `POST /demo/sample` | Load sample data |
 | `POST /detection/rerun` | Reloads `rules.yaml` and adds any new Alerts. Existing Alerts and Cases stay untouched |
+| `GET /graph/node?id=&type=` | One entity's facts and associated records, within the Portfolio |
 | `GET /stats` | Records processed, flagged events, risk distribution, fraud categories |
 | `GET /alerts` | Portfolio-scoped, filterable by `customer`, `transaction`, `product`, `risk_level`, `date_from`, `date_to`, `detection_type` |
 | `GET /cases` | Portfolio-scoped Case queue |
-| `GET /cases/{id}` | Case, Alert, supporting records, Decisions and any report |
+| `GET /cases/{id}` | Case, Alerts, grouping reasons, timeline, relationship graph, notes, classifications, evidence history and any report |
 | `POST /cases/{id}/decision` | Appends a Decision |
+| `POST /cases/{id}/notes` | Appends an investigation note |
+| `POST /cases/{id}/risk` | Appends a risk classification, which needs a reason |
+| `POST /cases/{id}/alerts/{alert_id}/separate` | Takes an Alert out of a Case, which needs a reason |
+| `GET /cases/{id}/report` | Downloads the structured Case report as JSON |
 | `POST /cases/{id}/investigation` | Optional `{"replay": true}`. Returns 202 and `{investigation_id}`, or the existing one |
 | `GET /investigations/{id}` | Status, report, evidence, follow-ups, `trace_url`, `is_replay` |
 | `GET /investigations/{id}/steps?after=` | Polled step log |
@@ -323,8 +332,10 @@ One fixed random seed, in INR.
 - ID formats: `ACC-10042`, `TXN-…`, `DEV-…`, `BEN-…`, `CUS-…`. Amounts are plain decimals and dates are ISO.
 - `customers` include contact details and onboarding information, so identity attributes can be linked.
 - `logins {account_id, customer_id, device_id, ip, at, outcome}` hold login logs, and they feed `login_failures_then_success`.
-- `account_events {account_id, type, at, details}`, with types `password_reset | sim_swap | device_enrolled | beneficiary_added`.
-- `loan_applications {id, customer_id, device_id, amount, status, at}` hold about 150 applications.
+- `account_events {event_id, account_id, type, at, details}`, with types `password_reset | sim_swap | device_enrolled | beneficiary_added | bank_account_changed`.
+- `loan_applications {id, customer_id, device_id, amount, status, at, ip?, phone?, disbursed_account_id?, disbursed_at?}` hold about 150 applications.
+- `policies {policy_id, customer_id, product, sum_assured, start_date, status}` and `claims {claim_id, policy_id, customer_id, amount, status, at, device_id?, ip?, phone?}` hold about 100 policies and 40 claims.
+- Insurance and the linked scenario are generated after every older story, so the older seeded data stays identical.
 - Labels live in `ground_truth {transaction_id, is_fraud, story}`. No tool or API reads it. Only the eval runner does.
 
 ### Stories
@@ -350,6 +361,10 @@ Weights and thresholds live in `rules.yaml`. The score is the sum of these, capp
 | `shared_device` | 3+ customers on one device in 30 days. Points fall to 10 if they share a surname and address | 55 |
 | `login_failures_then_success` | 3+ failed logins then a success within an hour | 30 |
 | `multi_applicant_device` | 2+ customers apply for loans from one device in 30 days | 50 |
+| `loan_proceeds_transfer` | A new beneficiary is paid 50%+ of a loan within 72h of its payout into this account | 35 |
+| `recent_bank_change` | `bank_account_changed` within 7 days before the payout | 20 |
+| `early_claim` | Claim within 30 days of the policy starting | 25 |
+| `claim_linked_identity` | A claim's device, IP or phone is used by another customer outside the household | 45 |
 
 A high-value transfer alone doesn't alert, and a customer who regularly sends similar amounts won't trigger `amount_spike`.
 
@@ -431,7 +446,7 @@ Person A runs `python -m evals.run` from `backend/app`. It works on a temporary 
 
 ## 7. Governance screen
 
-**Audit trail:** `file_uploaded`, `rows_rejected`, `detection_rerun`, `investigation_started`, `tool_call`, `access_denied`, `verification_result`, `report_saved`, `decision_recorded`, `replay_started`, `investigation_replaced`, with Langfuse trace links.
+**Audit trail:** `file_uploaded`, `rows_rejected`, `detection_rerun`, `investigation_started`, `tool_call`, `access_denied`, `verification_result`, `report_saved`, `decision_recorded`, `replay_started`, `investigation_replaced`, `alerts_grouped`, `alert_separated`, `note_added`, `risk_reclassified`, `report_downloaded`, with Langfuse trace links.
 
 The screen also states that these are demonstrations of controls, not compliance claims. The AI inventory card and control table are cut.
 
@@ -506,6 +521,75 @@ If 13:15 slips:
 - **Rule outcomes** are unknown until the generator runs.
 - **The Verification regex** has to match what the synthetic data and the model actually produce.
 - **Replay** hasn't been built, so test one end to end before the 14:15 eval run.
-- **Later levels of the brief** haven't been seen.
+- **Investigations see the lead Alert only.** The agent wasn't changed for Level 2, so a report doesn't cover a Case's other Alerts, loans or claims.
+- **Saved evals predate Level 2.** The run on the Evaluations screen doesn't include the insurance stories or the linked scenario, and consolidation has no eval yet.
 - **Workload** is tight, because Level 1 and the Investigation share about 3¾ hours.
 - **Organiser data** may not match the fixed upload columns, so the templates need to be clear.
+
+## 12. Level 2
+
+Level 2 adds correlation, consolidation, a Case workspace, evidence history and prioritisation. All of it is deterministic code. The agent, prompts, tools and Replays are unchanged.
+
+| Brief requirement | Where it's met |
+|---|---|
+| Cross-system correlation | `correlation/consolidate.py`, across core banking, lending and insurance |
+| Relationships on every required entity | Case graph: customer, account, device, IP, phone, application, transaction, policy, claim, plus beneficiary |
+| Inspect a connected entity | Network tab and `GET /graph/node`, with associated records |
+| Relationships from real identifiers | Each graph edge carries `evidence`, naming the source record and field |
+| Consolidation, explained and reversible | Grouping reasons, Separate on each Alert, `case_links` |
+| Original Alerts retained | Alerts are never written again, and membership lives in `case_links` |
+| Workspace | Case page tabs: Overview, Timeline, Network, AI report, Evidence, Alerts, Notes and history |
+| Analyst actions | Decision drawer, section 3 |
+| Account actions stay recommendations | Nothing executes. No approval workflow is built, so nothing can |
+| Evidence history and audit | Notes and history tab, Governance |
+| Original classification retained | `classifications`, `original_risk_level`, unchanged Alerts |
+| Downloadable case report | `GET /cases/{id}/report` |
+| Prioritisation | `correlation/priority.py`, Case queue |
+| Insufficient evidence goes to review | `needs_review` band, capped below High |
+
+### Consolidation
+
+`consolidate` runs after detection, once per Portfolio, so a Case never crosses one. Settings live under `correlation` in `rules.yaml`.
+
+Two Alerts link only through a matching identifier:
+
+- **Same customer or account, or any identifier they share:** both must be actionable and within 3 days. This keeps everyday Low Alerts out of a Case.
+- **Device, IP or phone across customers:** within 7 days, and not within one household.
+- **Beneficiary across customers:** within 7 days, and one Alert must have `mule_beneficiary`.
+
+An identifier on more than 8 Alerts proves nothing and is ignored. No Case grows past 12 Alerts.
+
+- The lead Case is the one already being worked, then the highest-scoring, preferring a transaction so Replay still applies.
+- `case_links` is append-only. An Alert's latest row says where it sits.
+- A Case with a Decision, note, classification or Investigation is never absorbed. Linked Alerts join it instead.
+- A separated Alert returns to its own Case, or stands alone if it never opened one. Consolidation then leaves it alone for good.
+- The lead Alert can't be separated.
+
+### Prioritisation
+
+The score is a weighted sum from `rules.yaml`: severity 45%, exposure 30%, related Alerts 15%, confidence 10%.
+
+- **Severity:** the highest Alert score, or the Analyst's classification once they've changed it.
+- **Exposure:** the amounts on Alerted transactions, applications and claims. A transfer of loan proceeds isn't counted again when the loan is in the Case.
+- **Confidence:** High needs 3+ distinct rules plus 2+ Alerts or a score of 75+. Medium needs 2 rules. Low is one rule.
+- **Bands:** Critical 80+, High 60+, Medium 40+, Low below that.
+- Low confidence always gives **Needs review**, capped at 59, however large the score or amount. The Case queue sorts open Cases by score.
+
+### Scenario: linked loan diversion
+
+- **Applicant:** `ACC-10077`, `CUS-10770`, Analyst 1's Portfolio.
+- **Lending:** `APP-9001`, ₹6,00,000, from `DEV-9003` and IP `203.0.113.77`, shared with `APP-9002`, `APP-9003` and `APP-9004`. The last belongs to Analyst 2's Portfolio.
+- **Core banking:** `bank_account_changed`, then the payout, then `TXN-50003`, ₹5,75,000 to new beneficiary `BEN-7003`.
+- **Insurance:** `CLM-9001`, ₹4,00,000, on `POL-9001` for `CUS-10780`, 18 days after cover began, from the same device, IP and phone.
+- **Result:** one Critical Case of 6 Alerts across three systems, led by `TXN-50003`. Label: fraud.
+
+### Demo additions
+
+| Step | On screen | Say |
+|---|---|---|
+| 1 | Case queue, top row. | "Six Alerts from three systems are one Case, ranked by money and evidence, not just a score." |
+| 2 | Overview: why these were grouped, then Separate an Alert. | "Every link is a real identifier. If it's wrong, the Analyst separates it, and it stays separated." |
+| 3 | Network, click `DEV-9003`. | "The model drew none of this. Every line names its source record." |
+| 4 | Timeline. | "Loan, bank change, payout, transfer, claim, in one order." |
+| 5 | Change the risk classification, recommend a hold, download the report. | "The original stays on record, and a hold is only a recommendation." |
+| 6 | Takeover Case. | "Failed logins and the transfer are one account takeover. Anyone paying the same mule joins it." |

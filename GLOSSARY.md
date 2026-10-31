@@ -13,8 +13,20 @@ One agent run or conversation looking into a Case. It is optional, and always at
 _Avoid_: Run, session, chat
 
 **Case**:
-The record opened for an actionable Alert, holding its evidence, status, Decision history and any Investigation report. The Alert it came from never changes.
+The record opened for an actionable Alert, holding its evidence, status, Decision history and any Investigation report. It can hold several linked Alerts, and each Alert stays exactly as it was raised.
 _Avoid_: Report, ticket, finding
+
+**Lead Alert**:
+The Alert a consolidated Case is built around, and the one an Investigation looks into.
+_Avoid_: Primary Alert, parent
+
+**Consolidation**:
+Moving Alerts linked by a matching identifier into one Case. Code does it, never the model, and an Analyst can separate an Alert again.
+_Avoid_: Merge, clustering
+
+**Priority**:
+A Case's rank in the queue, from its severity, financial exposure, related Alerts and confidence. A Case with one kind of signal is marked Needs review instead of ranking high.
+_Avoid_: Risk level, score
 
 **Assessment**:
 The agent's conclusion in a Case on whether the activity is suspicious. It informs the Decision and never replaces it.
@@ -23,6 +35,10 @@ _Avoid_: Verdict, finding
 **Decision**:
 The Analyst's recorded outcome on a Case, which may change with its history kept. Recommended actions in a Case are not carried out by recording one.
 _Avoid_: Verdict, resolution
+
+**Recommendation**:
+A Decision advising a temporary hold or enhanced verification. It is a record only and acts on nothing.
+_Avoid_: Action, instruction
 
 **Follow-up**:
 A further analyst question within an existing Investigation, and its answer. It adds to the Investigation and never changes the Case.

@@ -44,8 +44,24 @@ const RISK: Record<string, string> = {
   low: 'bg-slate-100 text-slate-700',
 }
 
-export function Risk({ level }: { level: string }) {
-  return <span className={`rounded px-2 py-0.5 text-xs font-medium ${RISK[level]}`}>{level}</span>
+export function Risk({ level, named }: { level: string; named?: boolean }) {
+  return <span className={`whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${RISK[level]}`}>{named ? `Risk: ${label(level)}` : level}</span>
+}
+
+const BAND: Record<string, string> = {
+  critical: 'bg-red-700 text-white',
+  high: 'bg-red-100 text-red-800',
+  medium: 'bg-amber-100 text-amber-800',
+  low: 'bg-slate-100 text-slate-700',
+  needs_review: 'bg-violet-100 text-violet-800',
+}
+
+export function PriorityBadge({ band, named }: { band: string; named?: boolean }) {
+  return <span className={`whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${BAND[band]}`}>{named ? `Priority: ${label(band)}` : label(band)}</span>
+}
+
+export function money(value: number) {
+  return `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
 }
 
 export function Badge({ children, tone = 'slate' }: { children: ReactNode; tone?: 'slate' | 'green' | 'red' | 'amber' | 'blue' }) {

@@ -5,9 +5,10 @@
 FraudLens AI is a small web app that helps a bank find suspicious money activity.
 
 Think of it like a detective:
-- It reads bank records (customers, transactions, logins, loans).
+- It reads records (customers, transactions, logins, loans, insurance claims).
 - It looks for bad patterns (too many logins, new devices, strange transfers).
 - It makes **Alerts**.
+- It joins Alerts that share a real ID, like a device or phone number, into one **Case**.
 - A person (Analyst) looks at an Alert and decides what to do.
 
 Nothing here is real bank data. It is all fake demo data.
@@ -29,6 +30,7 @@ Nothing here is real bank data. It is all fake demo data.
 - `backend/app/api/main.py` - web API (URLs the frontend calls).
 - `backend/app/store.py` - database helpers.
 - `backend/app/detection/engine.py` - finds suspicious patterns.
+- `backend/app/correlation/` - joins Alerts into Cases and ranks them.
 - `backend/app/agent/` - AI investigation agent.
 - `backend/app/contracts.py` - shapes of data shared by frontend and backend.
 - `docs/spec.md` - full technical spec.
@@ -59,14 +61,14 @@ Each user sees only their own portfolio's data.
 
 1. **Upload** - drop a file or load sample data. Bad rows are listed.
 2. **Dashboard** - see counts, risk levels, categories, and Alerts. Click an Alert for details.
-3. **Case queue** - Alerts become Cases. Open one to investigate.
-4. **Investigation** - the AI reads evidence and writes a report. You make the final decision.
+3. **Case queue** - linked Alerts become one Case, most urgent first. Open one to investigate.
+4. **Case page** - see the timeline, the network of linked records and every Alert. The AI reads evidence and writes a report. You make the final decision, and you can split out an Alert that doesn't belong.
 5. **Evaluations** - how well detection and the agent did.
 6. **Governance** - audit log of actions.
 
 ## Simple words
 
 - **Alert** = "this looks suspicious."
-- **Case** = an Alert someone is working on.
+- **Case** = one or more linked Alerts someone is working on.
 - **Evidence** = records used to explain an Alert.
 - **Decision** = final human choice (fraud / not fraud / escalate).

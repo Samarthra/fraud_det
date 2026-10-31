@@ -100,7 +100,7 @@ export default function Dashboard() {
           <input aria-label="Customer" placeholder="Customer" className={inputClass} value={filters.customer} onChange={set('customer')} />
           <input aria-label="Transaction" placeholder="Transaction" className={inputClass} value={filters.transaction} onChange={set('transaction')} />
           <select aria-label="Product" className={inputClass} value={filters.product} onChange={set('product')}>
-            <option value="">All products</option><option value="core_banking">Core banking</option><option value="lending">Lending</option>
+            <option value="">All products</option><option value="core_banking">Core banking</option><option value="lending">Lending</option><option value="insurance">Insurance</option>
           </select>
           <select aria-label="Risk level" className={inputClass} value={filters.risk_level} onChange={set('risk_level')}>
             <option value="">All risk levels</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>

@@ -6,7 +6,7 @@ import { cn } from 'cn'
 import { useFileUpload } from '@/hooks/use-file-upload'
 import { UploadIcon, FileIcon, XIcon } from 'lucide-react'
 
-const DATASETS = ['customers', 'transactions', 'logins', 'loan_applications']
+const DATASETS = ['customers', 'transactions', 'logins', 'loan_applications', 'account_events', 'policies', 'claims']
 
 export default function Upload() {
   const [dataset, setDataset] = useState('transactions')

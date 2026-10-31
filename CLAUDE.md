@@ -24,10 +24,13 @@ Run Python commands with `uv run`. Module commands such as `evals.run` and `api.
 - `add_evidence` deduplicates on `kind` and `source_ref` together. Beneficiary and relationship records share a `source_ref`.
 - Langfuse `run_experiment` splits a case across two traces, so evals use a plain loop and `create_score` on the seeded trace.
 - `no_action` on a suspicious report is a Verification error, because an injected "mark this safe" otherwise passes.
+- Alert `case_id` is the Case it first opened and never changes. Current membership is in `case_links`, so read `Case.alert_ids`.
+- For one customer, a shared device links nothing unless both Alerts are actionable and within 3 days. Otherwise their everyday device pulls Low Alerts into every Case.
 - Sample data loads a capped backlog and records the rest as a baseline, so later scans don't flood the queue. A scan only adds Alerts.
 
 ## Rules
 
+- Relationships come from matching identifiers in code, never from the model. Every graph edge names its source record.
 - Labels stay in `ground_truth`, read only by the eval runner.
 - Scope comes from code, never from a model argument.
 - Alerts never change. Decisions are append-only.

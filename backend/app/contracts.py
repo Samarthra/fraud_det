@@ -4,8 +4,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-Product = Literal["core_banking", "lending"]
+Product = Literal["core_banking", "lending", "insurance"]
 RiskLevel = Literal["low", "medium", "high"]
+PriorityBand = Literal["critical", "high", "medium", "low", "needs_review"]
+Confidence = Literal["low", "medium", "high"]
 Assessment = Literal["suspicious", "not_suspicious"]
 Action = Literal[
     "hold_transaction",
@@ -16,9 +18,18 @@ Action = Literal[
     "no_action",
 ]
 DecisionValue = Literal[
-    "requires_investigation", "false_positive", "confirmed_fraud", "escalated"
+    "requires_investigation",
+    "false_positive",
+    "confirmed_fraud",
+    "escalated",
+    "information_requested",
+    "hold_recommended",
+    "verification_recommended",
+    "concluded",
 ]
-CaseStatus = Literal["new", "investigating", "report_ready", "decided"]
+EscalationTarget = Literal["fraud_specialist", "supervisor"]
+CaseStatus = Literal["new", "investigating", "report_ready", "awaiting_information", "decided"]
+LinkAction = Literal["grouped", "separated"]
 InvestigationStatus = Literal["running", "complete"]
 VerificationStatus = Literal["verified", "unverified"]
 EvidenceKind = Literal[
@@ -76,6 +87,8 @@ class Alert(BaseModel):
     transaction_id: str | None = None
     device_id: str | None = None
     application_id: str | None = None
+    policy_id: str | None = None
+    claim_id: str | None = None
     supporting_records: list[SupportingRecord]
     created_at: str
 
@@ -85,24 +98,92 @@ class Decision(BaseModel):
     analyst: str
     note: str = ""
     at: str
+    escalate_to: EscalationTarget | None = None
 
 
 class DecisionRequest(BaseModel):
     decision: DecisionValue
     note: str = ""
+    escalate_to: EscalationTarget | None = None
+
+
+class LinkReason(BaseModel):
+    """One matching identifier. A grouping with no reason can't exist."""
+
+    kind: str  # account, customer, device, ip, phone or beneficiary
+    value: str
+    alert_ids: list[str]
+    explanation: str
+
+
+class CaseLink(BaseModel):
+    """Append-only. The latest row for an Alert says which Case it sits in."""
+
+    alert_id: str
+    case_id: str
+    action: LinkAction
+    reasons: list[LinkReason] = []
+    actor: str  # "correlation" or an Analyst ID
+    note: str = ""
+    at: str
+
+
+class Priority(BaseModel):
+    score: int = Field(ge=0, le=100)
+    band: PriorityBand
+    severity: int
+    exposure: float  # INR, each sum of money counted once
+    related_events: int
+    confidence: Confidence
+    needs_review: bool
+    reasons: list[str]
+
+
+class Note(BaseModel):
+    text: str
+    analyst: str
+    at: str
+
+
+class NoteRequest(BaseModel):
+    text: str
+
+
+class Classification(BaseModel):
+    """An Analyst's change to a Case's risk. Alerts keep the original."""
+
+    previous: RiskLevel
+    risk_level: RiskLevel
+    reason: str
+    analyst: str
+    at: str
+
+
+class ClassificationRequest(BaseModel):
+    risk_level: RiskLevel
+    reason: str
+
+
+class SeparateRequest(BaseModel):
+    reason: str
 
 
 class Case(BaseModel):
     id: str
-    alert_id: str
+    alert_id: str  # the lead Alert, which an Investigation looks into
     customer_id: str
     account_id: str
     category: str
-    risk_level: RiskLevel
+    risk_level: RiskLevel  # the Analyst's latest classification, or original_risk_level
+    original_risk_level: RiskLevel | None = None
     supporting_records: list[SupportingRecord]
     status: CaseStatus
     decisions: list[Decision]  # append-only, latest is current
     investigation_id: str | None = None
+    alert_ids: list[str] = []
+    products: list[Product] = []
+    priority: Priority | None = None
+    merged_into: str | None = None
 
 
 class Evidence(BaseModel):
@@ -181,11 +262,71 @@ class Investigation(BaseModel):
     replay_captured_at: str | None = None
 
 
+class GraphNode(BaseModel):
+    id: str
+    type: str
+    label: str
+
+
+class GraphEdge(BaseModel):
+    source: str
+    target: str
+    label: str
+    evidence: str  # the source record and field that prove this edge
+
+
+class CaseGraph(BaseModel):
+    nodes: list[GraphNode]
+    edges: list[GraphEdge]
+    out_of_scope_count: int = 0
+
+
+class TimelineEvent(BaseModel):
+    at: str
+    system: Product
+    kind: str
+    source_ref: str
+    summary: str
+
+
+class HistoryEntry(BaseModel):
+    at: str
+    event: str
+    actor: str
+    summary: str
+
+
 class CaseDetail(BaseModel):
     case: Case
     alert: Alert
+    alerts: list[Alert] = []
+    reasons: list[LinkReason] = []
+    links: list[CaseLink] = []
+    notes: list[Note] = []
+    classifications: list[Classification] = []
+    timeline: list[TimelineEvent] = []
+    graph: CaseGraph | None = None
+    history: list[HistoryEntry] = []
     report: Report | None = None
     replay_available: bool = False
+
+
+class CaseReport(BaseModel):
+    """The downloadable evidence file for one Case."""
+
+    generated_at: str
+    generated_by: str
+    notice: str
+    case: Case
+    alerts: list[Alert]
+    grouping_reasons: list[LinkReason]
+    links: list[CaseLink]
+    relationships: CaseGraph
+    timeline: list[TimelineEvent]
+    notes: list[Note]
+    classifications: list[Classification]
+    investigation: "Investigation | None"
+    history: list[HistoryEntry]
 
 
 class StartInvestigation(BaseModel):

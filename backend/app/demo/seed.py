@@ -3,17 +3,21 @@
 from datetime import datetime, timedelta
 
 from demo.generator import generate
+from correlation.consolidate import consolidate
 from detection.engine import load_config, persist, scan
 
 BACKLOG_DAYS = 7
 BACKLOG_PER_ANALYST = 25
-MUST_SHOW = {"TXN-50001", "TXN-50002"}
+MUST_SHOW = {
+    "TXN-50001", "TXN-50002", "ACC-10042",  # the takeover's login Alert and its transfer
+    "TXN-50003", "APP-9001", "APP-9002", "APP-9003", "APP-9004", "CLM-9001", "DEV-9003",
+}
 
 
 def load_rows(store, sample) -> None:
-    for dataset in ("customers", "transactions", "logins", "loan_applications"):
+    for dataset in ("customers", "transactions", "logins", "loan_applications", "account_events",
+                    "policies", "claims"):
         store.insert_rows(dataset, getattr(sample, dataset))
-    store.insert_events(sample.account_events)
     store.insert_ground_truth(sample.ground_truth)
 
 
@@ -50,4 +54,6 @@ def load_sample(store, now: datetime | None = None) -> int:
     kept = backlog(candidates, config, reference, portfolios)
     shown = {c.dedupe_key for c in kept}
     store.add_baseline([c.dedupe_key for c in candidates if c.dedupe_key not in shown])
-    return persist(store, kept, config)
+    created = persist(store, kept, config)
+    consolidate(store, config)
+    return created

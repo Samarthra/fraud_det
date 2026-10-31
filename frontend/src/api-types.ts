@@ -21,6 +21,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Me */
+        get: operations["me_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Users */
+        get: operations["users_users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ingest/{dataset}": {
         parameters: {
             query?: never;
@@ -98,7 +132,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reset */
+        /**
+         * Reset
+         * @description Clears demo data. The audit trail survives, and records who reset.
+         */
         post: operations["reset_demo_reset_post"];
         delete?: never;
         options?: never;
@@ -123,6 +160,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/detection/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Detection Rules
+         * @description Read fresh each time, so the page always matches rules.yaml.
+         */
+        get: operations["detection_rules_detection_rules_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/stats": {
         parameters: {
             query?: never;
@@ -132,6 +189,40 @@ export interface paths {
         };
         /** Stats */
         get: operations["stats_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Graph */
+        get: operations["graph_graph_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/graph/node": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Graph Node */
+        get: operations["graph_node_graph_node_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -191,6 +282,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cases/{case_id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Case Report
+         * @description The structured evidence file, as a download.
+         */
+        get: operations["case_report_cases__case_id__report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/cases/{case_id}/decision": {
         parameters: {
             query?: never;
@@ -202,6 +313,63 @@ export interface paths {
         put?: never;
         /** Decide */
         post: operations["decide_cases__case_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/{case_id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Note */
+        post: operations["add_note_cases__case_id__notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/{case_id}/risk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reclassify
+         * @description Records a new risk level. The Alerts and every earlier classification stay as they were.
+         */
+        post: operations["reclassify_cases__case_id__risk_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/{case_id}/alerts/{alert_id}/separate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Separate
+         * @description Takes a wrongly grouped Alert out. It keeps its evidence, and consolidation leaves it alone.
+         */
+        post: operations["separate_cases__case_id__alerts__alert_id__separate_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -293,6 +461,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/evals/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Evals Status */
+        get: operations["evals_status_evals_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/evals/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Evals Run
+         * @description Separate process, so the run survives an API restart and never blocks a request.
+         */
+        post: operations["evals_run_evals_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/audit": {
         parameters: {
             query?: never;
@@ -326,7 +531,7 @@ export interface components {
              * Product
              * @enum {string}
              */
-            product: "core_banking" | "lending";
+            product: "core_banking" | "lending" | "insurance";
             /**
              * Risk Level
              * @enum {string}
@@ -346,6 +551,10 @@ export interface components {
             device_id?: string | null;
             /** Application Id */
             application_id?: string | null;
+            /** Policy Id */
+            policy_id?: string | null;
+            /** Claim Id */
+            claim_id?: string | null;
             /** Supporting Records */
             supporting_records: components["schemas"]["SupportingRecord"][];
             /** Created At */
@@ -382,22 +591,73 @@ export interface components {
              * @enum {string}
              */
             risk_level: "low" | "medium" | "high";
+            /** Original Risk Level */
+            original_risk_level?: ("low" | "medium" | "high") | null;
             /** Supporting Records */
             supporting_records: components["schemas"]["SupportingRecord"][];
             /**
              * Status
              * @enum {string}
              */
-            status: "new" | "investigating" | "report_ready" | "decided";
+            status: "new" | "investigating" | "report_ready" | "awaiting_information" | "decided";
             /** Decisions */
             decisions: components["schemas"]["Decision"][];
             /** Investigation Id */
             investigation_id?: string | null;
+            /**
+             * Alert Ids
+             * @default []
+             */
+            alert_ids: string[];
+            /**
+             * Products
+             * @default []
+             */
+            products: ("core_banking" | "lending" | "insurance")[];
+            priority?: components["schemas"]["Priority"] | null;
+            /** Merged Into */
+            merged_into?: string | null;
         };
         /** CaseDetail */
         CaseDetail: {
             case: components["schemas"]["Case"];
             alert: components["schemas"]["Alert"];
+            /**
+             * Alerts
+             * @default []
+             */
+            alerts: components["schemas"]["Alert"][];
+            /**
+             * Reasons
+             * @default []
+             */
+            reasons: components["schemas"]["LinkReason"][];
+            /**
+             * Links
+             * @default []
+             */
+            links: components["schemas"]["CaseLink"][];
+            /**
+             * Notes
+             * @default []
+             */
+            notes: components["schemas"]["Note"][];
+            /**
+             * Classifications
+             * @default []
+             */
+            classifications: components["schemas"]["Classification"][];
+            /**
+             * Timeline
+             * @default []
+             */
+            timeline: components["schemas"]["TimelineEvent"][];
+            graph?: components["schemas"]["CaseGraph"] | null;
+            /**
+             * History
+             * @default []
+             */
+            history: components["schemas"]["HistoryEntry"][];
             report?: components["schemas"]["Report"] | null;
             /**
              * Replay Available
@@ -405,13 +665,115 @@ export interface components {
              */
             replay_available: boolean;
         };
+        /** CaseGraph */
+        CaseGraph: {
+            /** Nodes */
+            nodes: components["schemas"]["GraphNode"][];
+            /** Edges */
+            edges: components["schemas"]["GraphEdge"][];
+            /**
+             * Out Of Scope Count
+             * @default 0
+             */
+            out_of_scope_count: number;
+        };
+        /**
+         * CaseLink
+         * @description Append-only. The latest row for an Alert says which Case it sits in.
+         */
+        CaseLink: {
+            /** Alert Id */
+            alert_id: string;
+            /** Case Id */
+            case_id: string;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "grouped" | "separated";
+            /**
+             * Reasons
+             * @default []
+             */
+            reasons: components["schemas"]["LinkReason"][];
+            /** Actor */
+            actor: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /** At */
+            at: string;
+        };
+        /**
+         * CaseReport
+         * @description The downloadable evidence file for one Case.
+         */
+        CaseReport: {
+            /** Generated At */
+            generated_at: string;
+            /** Generated By */
+            generated_by: string;
+            /** Notice */
+            notice: string;
+            case: components["schemas"]["Case"];
+            /** Alerts */
+            alerts: components["schemas"]["Alert"][];
+            /** Grouping Reasons */
+            grouping_reasons: components["schemas"]["LinkReason"][];
+            /** Links */
+            links: components["schemas"]["CaseLink"][];
+            relationships: components["schemas"]["CaseGraph"];
+            /** Timeline */
+            timeline: components["schemas"]["TimelineEvent"][];
+            /** Notes */
+            notes: components["schemas"]["Note"][];
+            /** Classifications */
+            classifications: components["schemas"]["Classification"][];
+            investigation: components["schemas"]["Investigation"] | null;
+            /** History */
+            history: components["schemas"]["HistoryEntry"][];
+        };
+        /**
+         * Classification
+         * @description An Analyst's change to a Case's risk. Alerts keep the original.
+         */
+        Classification: {
+            /**
+             * Previous
+             * @enum {string}
+             */
+            previous: "low" | "medium" | "high";
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "low" | "medium" | "high";
+            /** Reason */
+            reason: string;
+            /** Analyst */
+            analyst: string;
+            /** At */
+            at: string;
+        };
+        /** ClassificationRequest */
+        ClassificationRequest: {
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "low" | "medium" | "high";
+            /** Reason */
+            reason: string;
+        };
         /** Decision */
         Decision: {
             /**
              * Decision
              * @enum {string}
              */
-            decision: "requires_investigation" | "false_positive" | "confirmed_fraud" | "escalated";
+            decision: "requires_investigation" | "false_positive" | "confirmed_fraud" | "escalated" | "information_requested" | "hold_recommended" | "verification_recommended" | "concluded";
             /** Analyst */
             analyst: string;
             /**
@@ -421,6 +783,8 @@ export interface components {
             note: string;
             /** At */
             at: string;
+            /** Escalate To */
+            escalate_to?: ("fraud_specialist" | "supervisor") | null;
         };
         /** DecisionRequest */
         DecisionRequest: {
@@ -428,12 +792,14 @@ export interface components {
              * Decision
              * @enum {string}
              */
-            decision: "requires_investigation" | "false_positive" | "confirmed_fraud" | "escalated";
+            decision: "requires_investigation" | "false_positive" | "confirmed_fraud" | "escalated" | "information_requested" | "hold_recommended" | "verification_recommended" | "concluded";
             /**
              * Note
              * @default
              */
             note: string;
+            /** Escalate To */
+            escalate_to?: ("fraud_specialist" | "supervisor") | null;
         };
         /** Evidence */
         Evidence: {
@@ -487,10 +853,41 @@ export interface components {
             /** Question */
             question: string;
         };
+        /** GraphEdge */
+        GraphEdge: {
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+            /** Label */
+            label: string;
+            /** Evidence */
+            evidence: string;
+        };
+        /** GraphNode */
+        GraphNode: {
+            /** Id */
+            id: string;
+            /** Type */
+            type: string;
+            /** Label */
+            label: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HistoryEntry */
+        HistoryEntry: {
+            /** At */
+            at: string;
+            /** Event */
+            event: string;
+            /** Actor */
+            actor: string;
+            /** Summary */
+            summary: string;
         };
         /** Investigation */
         Investigation: {
@@ -522,6 +919,59 @@ export interface components {
         InvestigationStarted: {
             /** Investigation Id */
             investigation_id: string;
+        };
+        /**
+         * LinkReason
+         * @description One matching identifier. A grouping with no reason can't exist.
+         */
+        LinkReason: {
+            /** Kind */
+            kind: string;
+            /** Value */
+            value: string;
+            /** Alert Ids */
+            alert_ids: string[];
+            /** Explanation */
+            explanation: string;
+        };
+        /** Note */
+        Note: {
+            /** Text */
+            text: string;
+            /** Analyst */
+            analyst: string;
+            /** At */
+            at: string;
+        };
+        /** NoteRequest */
+        NoteRequest: {
+            /** Text */
+            text: string;
+        };
+        /** Priority */
+        Priority: {
+            /** Score */
+            score: number;
+            /**
+             * Band
+             * @enum {string}
+             */
+            band: "critical" | "high" | "medium" | "low" | "needs_review";
+            /** Severity */
+            severity: number;
+            /** Exposure */
+            exposure: number;
+            /** Related Events */
+            related_events: number;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "low" | "medium" | "high";
+            /** Needs Review */
+            needs_review: boolean;
+            /** Reasons */
+            reasons: string[];
         };
         /** RejectedRow */
         RejectedRow: {
@@ -559,6 +1009,11 @@ export interface components {
             rule: string;
             /** Points */
             points: number;
+            /** Reason */
+            reason: string;
+        };
+        /** SeparateRequest */
+        SeparateRequest: {
             /** Reason */
             reason: string;
         };
@@ -619,6 +1074,22 @@ export interface components {
             data: {
                 [key: string]: unknown;
             };
+        };
+        /** TimelineEvent */
+        TimelineEvent: {
+            /** At */
+            at: string;
+            /**
+             * System
+             * @enum {string}
+             */
+            system: "core_banking" | "lending" | "insurance";
+            /** Kind */
+            kind: string;
+            /** Source Ref */
+            source_ref: string;
+            /** Summary */
+            summary: string;
         };
         /** UploadResult */
         UploadResult: {
@@ -690,12 +1161,50 @@ export interface operations {
             };
         };
     };
+    me_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Analyst"];
+                };
+            };
+        };
+    };
+    users_users_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     ingest_ingest__dataset__post: {
         parameters: {
             query?: never;
-            header?: {
-                "x-analyst-id"?: string | null;
-            };
+            header?: never;
             path: {
                 dataset: string;
             };
@@ -821,9 +1330,69 @@ export interface operations {
     rerun_detection_rerun_post: {
         parameters: {
             query?: never;
-            header?: {
-                "x-analyst-id"?: string | null;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
+        };
+    };
+    detection_rules_detection_rules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    stats_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Stats"];
+                };
+            };
+        };
+    };
+    graph_graph_get: {
+        parameters: {
+            query: {
+                account_id: string;
+            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -849,12 +1418,13 @@ export interface operations {
             };
         };
     };
-    stats_stats_get: {
+    graph_node_graph_node_get: {
         parameters: {
-            query?: never;
-            header?: {
-                "x-analyst-id"?: string | null;
+            query: {
+                id: string;
+                type: string;
             };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -866,7 +1436,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Stats"];
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -891,9 +1461,7 @@ export interface operations {
                 date_to?: string | null;
                 detection_type?: string | null;
             };
-            header?: {
-                "x-analyst-id"?: string | null;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -922,9 +1490,7 @@ export interface operations {
     cases_cases_get: {
         parameters: {
             query?: never;
-            header?: {
-                "x-analyst-id"?: string | null;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -939,23 +1505,12 @@ export interface operations {
                     "application/json": components["schemas"]["Case"][];
                 };
             };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
         };
     };
     case_detail_cases__case_id__get: {
         parameters: {
             query?: never;
-            header?: {
-                "x-analyst-id"?: string | null;
-            };
+            header?: never;
             path: {
                 case_id: string;
             };
@@ -983,12 +1538,41 @@ export interface operations {
             };
         };
     };
+    case_report_cases__case_id__report_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     decide_cases__case_id__decision_post: {
         parameters: {
             query?: never;
-            header?: {
-                "x-analyst-id"?: string | null;
-            };
+            header?: never;
             path: {
                 case_id: string;
             };
@@ -1020,12 +1604,116 @@ export interface operations {
             };
         };
     };
+    add_note_cases__case_id__notes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Note"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reclassify_cases__case_id__risk_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassificationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Case"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    separate_cases__case_id__alerts__alert_id__separate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+                alert_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeparateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Case"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     investigate_cases__case_id__investigation_post: {
         parameters: {
             query?: never;
-            header?: {
-                "x-analyst-id"?: string | null;
-            };
+            header?: never;
             path: {
                 case_id: string;
             };
@@ -1060,9 +1748,7 @@ export interface operations {
     investigation_investigations__investigation_id__get: {
         parameters: {
             query?: never;
-            header?: {
-                "x-analyst-id"?: string | null;
-            };
+            header?: never;
             path: {
                 investigation_id: string;
             };
@@ -1095,9 +1781,7 @@ export interface operations {
             query?: {
                 after?: number;
             };
-            header?: {
-                "x-analyst-id"?: string | null;
-            };
+            header?: never;
             path: {
                 investigation_id: string;
             };
@@ -1128,9 +1812,7 @@ export interface operations {
     follow_up_investigations__investigation_id__followups_post: {
         parameters: {
             query?: never;
-            header?: {
-                "x-analyst-id"?: string | null;
-            };
+            header?: never;
             path: {
                 investigation_id: string;
             };
@@ -1182,12 +1864,10 @@ export interface operations {
             };
         };
     };
-    audit_audit_get: {
+    evals_status_evals_status_get: {
         parameters: {
             query?: never;
-            header?: {
-                "x-analyst-id"?: string | null;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -1202,13 +1882,44 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
-            /** @description Validation Error */
-            422: {
+        };
+    };
+    evals_run_evals_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    audit_audit_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

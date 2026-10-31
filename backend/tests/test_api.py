@@ -321,7 +321,7 @@ def test_graph_node_details_deny_other_portfolios_and_are_audited(client):
 def test_detection_rules_are_live_and_need_a_sign_in(client, monkeypatch):
     assert client.get("/detection/rules").status_code == 401
     rules = client.get("/detection/rules", headers=ONE).json()
-    assert rules["thresholds"]["actionable"] == 50 and len(rules["rules"]) == 10
+    assert rules["thresholds"]["actionable"] == 50 and len(rules["rules"]) == 14
     monkeypatch.setattr(main, "load_config", lambda: {"thresholds": {"actionable": 40}, "rules": {}})
     assert client.get("/detection/rules", headers=ONE).json()["thresholds"]["actionable"] == 40
 

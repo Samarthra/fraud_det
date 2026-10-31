@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, UploadFile
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
@@ -23,18 +23,26 @@ from contracts import (  # noqa: E402
     AnalystScope,
     Case,
     CaseDetail,
+    CaseLink,
+    CaseReport,
+    Classification,
+    ClassificationRequest,
     Decision,
     DecisionRequest,
     FollowUp,
     FollowUpRequest,
     Investigation,
     InvestigationStarted,
+    Note,
+    NoteRequest,
+    SeparateRequest,
     StartInvestigation,
     Stats,
     Step,
     SupportingRecord,
     UploadResult,
 )
+from correlation.workspace import case_graph, current_reasons, history, timeline  # noqa: E402
 from demo import replay as replays  # noqa: E402
 from demo.sample_files import bad_rows_csv  # noqa: E402
 from demo.seed import load_sample  # noqa: E402
@@ -46,6 +54,16 @@ DB_PATH = os.environ.get("FRAUDLENS_DB", str(Path(__file__).resolve().parents[2]
 RESULTS = Path(__file__).resolve().parents[1] / "evals" / "results" / "latest.json"
 PROGRESS = RESULTS.with_name("progress.json")
 APP_DIR = Path(__file__).resolve().parents[1]
+NEEDS_NOTE = {
+    "false_positive": "Give a reason for marking this a false positive.",
+    "information_requested": "Say what information is needed.",
+    "hold_recommended": "Say why a temporary hold is recommended.",
+    "verification_recommended": "Say why enhanced verification is recommended.",
+    "concluded": "Write the investigation conclusion.",
+}
+REPORT_NOTICE = (
+    "Synthetic data. Recommended actions are recommendations only and have not been carried out."
+)
 store = Store(DB_PATH)
 
 
@@ -118,6 +136,14 @@ def owned_investigation(investigation_id: str, scope: AnalystScope) -> Investiga
         raise HTTPException(404, "Investigation not found.")
     owned_case(investigation.case_id, scope)
     return investigation
+
+
+def open_case(case_id: str, scope: AnalystScope) -> Case:
+    """Work goes on the lead Case, so a consolidated Case can't drift out of step with it."""
+    case = owned_case(case_id, scope)
+    if case.merged_into:
+        raise HTTPException(409, f"{case_id} was consolidated into {case.merged_into}.")
+    return case
 
 
 @app.get("/analysts", response_model=list[Analyst])
@@ -262,28 +288,124 @@ def cases(scope: AnalystScope = Depends(current_scope)):
     return [scoped(c, scope.portfolio) for c in store.cases(scope.portfolio)]
 
 
-@app.get("/cases/{case_id}", response_model=CaseDetail)
-def case_detail(case_id: str, scope: AnalystScope = Depends(current_scope)):
-    owned_case(case_id, scope)
+def workspace(case_id: str, scope: AnalystScope) -> CaseDetail:
+    """The full Case, built only from Alerts and records this Analyst may see."""
     detail = store.case_detail(case_id)
     detail.replay_available = replays.replay_file(detail.alert.transaction_id) is not None
     detail.case = scoped(detail.case, scope.portfolio)
     detail.alert = scoped(detail.alert, scope.portfolio)
+    alerts = [scoped(a, scope.portfolio) for a in detail.alerts] or [detail.alert]
+    detail.alerts = alerts
+    detail.reasons = current_reasons(detail.links, detail.case.alert_ids)
+    detail.timeline = timeline(store, alerts, scope.portfolio)
+    detail.graph = case_graph(store, alerts, scope.portfolio)
+    detail.history = history(store, detail.case, alerts)
     return detail
+
+
+@app.get("/cases/{case_id}", response_model=CaseDetail)
+def case_detail(case_id: str, scope: AnalystScope = Depends(current_scope)):
+    owned_case(case_id, scope)
+    return workspace(case_id, scope)
+
+
+@app.get("/cases/{case_id}/report", response_model=CaseReport)
+def case_report(case_id: str, scope: AnalystScope = Depends(current_scope)):
+    """The structured evidence file, as a download."""
+    open_case(case_id, scope)
+    detail = workspace(case_id, scope)
+    investigation = (
+        store.get_investigation(detail.case.investigation_id) if detail.case.investigation_id else None
+    )
+    report = CaseReport(
+        generated_at=now(),
+        generated_by=scope.analyst_id,
+        notice=REPORT_NOTICE,
+        case=detail.case,
+        alerts=detail.alerts,
+        grouping_reasons=detail.reasons,
+        links=detail.links,
+        relationships=detail.graph,
+        timeline=detail.timeline,
+        notes=detail.notes,
+        classifications=detail.classifications,
+        investigation=investigation,
+        history=detail.history,
+    )
+    store.audit("report_downloaded", analyst_id=scope.analyst_id, case_id=case_id)
+    return JSONResponse(
+        report.model_dump(mode="json"),
+        headers={"Content-Disposition": f"attachment; filename={case_id}_report.json"},
+    )
 
 
 @app.post("/cases/{case_id}/decision", response_model=Case)
 def decide(case_id: str, body: DecisionRequest, scope: AnalystScope = Depends(current_scope)):
-    case = owned_case(case_id, scope)
+    case = open_case(case_id, scope)
     report = store.get_report(case.investigation_id) if case.investigation_id else None
     if report and report.verification == "unverified" and not body.note.strip():
         raise HTTPException(422, "A note is required when the report is Unverified.")
+    if body.decision in NEEDS_NOTE and not body.note.strip():
+        raise HTTPException(422, NEEDS_NOTE[body.decision])
+    if body.escalate_to and body.decision != "escalated":
+        raise HTTPException(422, "Only an escalation has a target.")
     store.add_decision(
         case_id,
-        Decision(decision=body.decision, analyst=scope.analyst_id, note=body.note, at=now()),
+        Decision(decision=body.decision, analyst=scope.analyst_id, note=body.note, at=now(),
+                 escalate_to=body.escalate_to),
     )
     store.audit("decision_recorded", analyst_id=scope.analyst_id, case_id=case_id,
-                decision=body.decision, note=body.note)
+                decision=body.decision, note=body.note, escalate_to=body.escalate_to)
+    return scoped(store.get_case(case_id), scope.portfolio)
+
+
+@app.post("/cases/{case_id}/notes", response_model=Note, status_code=201)
+def add_note(case_id: str, body: NoteRequest, scope: AnalystScope = Depends(current_scope)):
+    open_case(case_id, scope)
+    if not body.text.strip():
+        raise HTTPException(422, "A note can't be empty.")
+    note = Note(text=body.text.strip(), analyst=scope.analyst_id, at=now())
+    store.add_note(case_id, note)
+    store.audit("note_added", analyst_id=scope.analyst_id, case_id=case_id)
+    return note
+
+
+@app.post("/cases/{case_id}/risk", response_model=Case)
+def reclassify(case_id: str, body: ClassificationRequest, scope: AnalystScope = Depends(current_scope)):
+    """Records a new risk level. The Alerts and every earlier classification stay as they were."""
+    case = open_case(case_id, scope)
+    if not body.reason.strip():
+        raise HTTPException(422, "Give a reason for changing the risk classification.")
+    if body.risk_level == case.risk_level:
+        raise HTTPException(422, f"The risk is already {case.risk_level}.")
+    store.add_classification(
+        case_id,
+        Classification(previous=case.risk_level, risk_level=body.risk_level, reason=body.reason.strip(),
+                       analyst=scope.analyst_id, at=now()),
+    )
+    store.audit("risk_reclassified", analyst_id=scope.analyst_id, case_id=case_id,
+                previous=case.risk_level, risk_level=body.risk_level, reason=body.reason)
+    return scoped(store.get_case(case_id), scope.portfolio)
+
+
+@app.post("/cases/{case_id}/alerts/{alert_id}/separate", response_model=Case)
+def separate(
+    case_id: str, alert_id: str, body: SeparateRequest, scope: AnalystScope = Depends(current_scope)
+):
+    """Takes a wrongly grouped Alert out. It keeps its evidence, and consolidation leaves it alone."""
+    case = open_case(case_id, scope)
+    if not body.reason.strip():
+        raise HTTPException(422, "Give a reason for separating this Alert.")
+    if alert_id not in case.alert_ids:
+        raise HTTPException(404, f"{alert_id} isn't in {case_id}.")
+    if alert_id == case.alert_id:
+        raise HTTPException(409, "The lead Alert can't be separated from its own Case.")
+    store.add_case_link(
+        CaseLink(alert_id=alert_id, case_id=case_id, action="separated", actor=scope.analyst_id,
+                 note=body.reason.strip(), at=now())
+    )
+    store.audit("alert_separated", analyst_id=scope.analyst_id, case_id=case_id, alert_id=alert_id,
+                reason=body.reason)
     return scoped(store.get_case(case_id), scope.portfolio)
 
 
@@ -294,7 +416,7 @@ def investigate(
     body: StartInvestigation | None = None,
     scope: AnalystScope = Depends(current_scope),
 ):
-    case = owned_case(case_id, scope)
+    case = open_case(case_id, scope)
     replay = bool(body and body.replay)
     existing = store.get_investigation(case.investigation_id) if case.investigation_id else None
     if not replay:

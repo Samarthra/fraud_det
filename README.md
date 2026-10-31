@@ -2,16 +2,19 @@
 
 An AI-assisted digital fraud investigation system, built for the Azentio AI Hackathon on 31 October 2026.
 
-FraudLens loads customer, transaction, login and loan data, flags suspicious activity with explainable rules, and opens Cases for an Analyst. An AI agent can investigate a Case and draft a report whose facts are checked in code. A human always makes the Decision.
+FraudLens loads customer, transaction, login, loan and insurance data, flags suspicious activity with explainable rules, links related Alerts across those systems into one Case, and ranks Cases for an Analyst. An AI agent can investigate a Case and draft a report whose facts are checked in code. A human always makes the Decision.
 
 All data is synthetic. This prototype demonstrates controls. It doesn't claim legal compliance or certification.
 
 ## What it does
 
 - **Upload:** CSV, Excel or JSON, with every invalid row listed and its reason given.
-- **Detection:** configurable rules add up to a 0-100 score, covering suspicious transfers, shared devices, repeated login failures and suspicious loan applications.
+- **Detection:** configurable rules add up to a 0-100 score, covering suspicious transfers, shared devices, repeated login failures, suspicious loan applications, loan proceeds diversion and linked insurance claims.
+- **Correlation:** Alerts sharing a real identifier become one Case, with the reason shown. An Analyst can separate any Alert, and the original Alerts never change.
 - **Dashboard:** counts, risk distribution, fraud categories and six filters, with the reasons behind each Alert.
-- **Case queue:** every actionable Alert opens a Case. Decision history is kept, and the original Alert never changes.
+- **Case queue:** ranked by severity, financial exposure, related Alerts and confidence. A Case resting on one kind of signal is marked Needs review.
+- **Case workspace:** risk assessment, timeline, relationship network, Alerts, notes and full evidence history, with a downloadable JSON report.
+- **Analyst actions:** confirm, mark false positive, request information, escalate, recommend a hold or enhanced verification, record a conclusion, change the risk classification. Recommendations are never carried out.
 - **Investigation:** a LangGraph agent chooses its own evidence tools, with live steps on screen and a Langfuse trace for each run.
 - **Verification:** code checks each amount, date and record ID against the cited Evidence, so a report that fails is marked Unverified.
 - **Access control:** each Analyst sees only their own Portfolio, enforced at the tool and API layers, and denials are audited.
@@ -58,6 +61,7 @@ Sign in with `analyst-1` or `analyst-2`, password `password`. These are public d
 4. Press **Investigate**, watch the steps, then click a cited Evidence ID in the report.
 5. Record a Decision, then see it on **Governance**.
 6. Use `TXN-50002` for the false-positive scenario, or log out and sign in as the other Analyst to see access denied.
+7. On **Case queue**, open the top Case, `TXN-50003`: six Alerts across lending, core banking and insurance. Read why they were grouped, click `DEV-9003` on **Network**, follow **Timeline**, separate an Alert, change the risk, recommend a hold and download the report.
 
 Press **Reset demo** to start again. To try different detection settings, edit `backend/app/detection/rules.yaml`, then press **Re-run detection** on the Dashboard. A re-run only adds Alerts.
 
@@ -93,6 +97,7 @@ It writes `evals/results/latest.json`, which the Evaluations screen shows.
 | `backend/app/agent/` | The agent graph, prompts and Verification |
 | `backend/app/tools/` | Evidence tools |
 | `backend/app/detection/` | Rules and scoring |
+| `backend/app/correlation/` | Consolidation, prioritisation, Case workspace |
 | `backend/app/ingest/` | Upload parsing and validation |
 | `backend/app/demo/` | Sample data, Replay |
 | `backend/app/evals/` | Eval suite |

@@ -13,6 +13,10 @@ export type FollowUp = S['FollowUp']
 export type Stats = S['Stats']
 export type UploadResult = S['UploadResult']
 export type DecisionValue = S['DecisionRequest']['decision']
+export type EscalationTarget = NonNullable<S['DecisionRequest']['escalate_to']>
+export type RiskLevel = S['ClassificationRequest']['risk_level']
+export type CaseGraph = S['CaseGraph']
+export type Priority = S['Priority']
 
 export type AuditRow = {
   seq: number
@@ -81,6 +85,7 @@ export type GraphNodeDetail = {
   accounts: string[]
   out_of_scope_count: number
   cases: { id: string; category: string; risk_level: string }[]
+  records?: { kind: string; source_ref: string; data: Record<string, unknown> }[]
 }
 
 export type DetectionRules = {
@@ -185,8 +190,22 @@ export const api = {
   },
   cases: () => request<Case[]>('/cases'),
   caseDetail: (id: string) => request<CaseDetail>(`/cases/${id}`),
-  decide: (id: string, decision: DecisionValue, note: string) =>
-    post<Case>(`/cases/${id}/decision`, { decision, note }),
+  decide: (id: string, decision: DecisionValue, note: string, escalateTo?: EscalationTarget) =>
+    post<Case>(`/cases/${id}/decision`, { decision, note, escalate_to: escalateTo ?? null }),
+  addNote: (id: string, text: string) => post<unknown>(`/cases/${id}/notes`, { text }),
+  reclassify: (id: string, riskLevel: RiskLevel, reason: string) =>
+    post<Case>(`/cases/${id}/risk`, { risk_level: riskLevel, reason }),
+  separate: (id: string, alertId: string, reason: string) =>
+    post<Case>(`/cases/${id}/alerts/${alertId}/separate`, { reason }),
+  downloadReport: async (id: string) => {
+    const report = await request<unknown>(`/cases/${id}/report`)
+    const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${id}_report.json`
+    link.click()
+    URL.revokeObjectURL(url)
+  },
   investigate: (id: string, replay: boolean) =>
     post<{ investigation_id: string }>(`/cases/${id}/investigation`, { replay }),
   investigation: (id: string) => request<Investigation>(`/investigations/${id}`),

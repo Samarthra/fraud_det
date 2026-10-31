@@ -14,3 +14,19 @@ rules:
   shared_device: {points: 55, family_points: 10, customers: 3, window_days: 30}
   login_failures_then_success: {points: 30, failures: 3, within_minutes: 60, transfer_within_minutes: 120}
   multi_applicant_device: {points: 50, customers: 2, window_days: 30}
+  loan_proceeds_transfer: {points: 35, hours: 72, min_share: 0.5}
+  recent_bank_change: {points: 20, days: 7}
+  early_claim: {points: 25, days: 30}
+  claim_linked_identity: {points: 45}
+# Alerts link only through a matching identifier inside this window.
+correlation:
+  window_days: 7        # device, IP, phone or mule beneficiary
+  owner_window_days: 3  # same account or customer, both actionable
+  max_alerts: 12    # the largest Case consolidation may build
+  hub_limit: 8      # an identifier on more Alerts than this is too common to prove a link
+priority:
+  weights: {severity: 0.45, exposure: 0.30, events: 0.15, confidence: 0.10}
+  exposure_cap: 500000     # INR at which exposure scores in full
+  events_cap: 5            # related events at which the count scores in full
+  bands: {critical: 80, high: 60, medium: 40}
+  needs_review_cap: 59     # one signal alone can never rank as High or Critical

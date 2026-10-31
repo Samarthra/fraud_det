@@ -77,7 +77,7 @@ function column(ids: string[], x: number) {
   return ids.map((id, i) => [id, { x, y: top + i * ROW }] as const)
 }
 
-function Details({
+export function Details({
   detail,
   error,
   isFocus,
@@ -87,8 +87,8 @@ function Details({
   detail: GraphNodeDetail | null
   error: string | null
   isFocus: boolean
-  onRecentre: (id: string) => void
-  onPick: (id: string) => void
+  onRecentre?: (id: string) => void
+  onPick?: (id: string) => void
 }) {
   if (error) return <ErrorNote message={error} />
   if (!detail) return <p className="text-sm text-slate-600">Click a node to see its details.</p>
@@ -107,7 +107,7 @@ function Details({
           </div>
         ))}
       </dl>
-      {detail.type === 'account' && !isFocus && <Button onClick={() => onRecentre(detail.id)}>Re-centre here</Button>}
+      {detail.type === 'account' && !isFocus && onRecentre && <Button onClick={() => onRecentre(detail.id)}>Re-centre here</Button>}
       {detail.cases.length > 0 && (
         <div>
           <h3 className="text-xs font-semibold text-slate-500">Open Cases</h3>
@@ -127,7 +127,9 @@ function Details({
           <ul className="mt-1 flex flex-wrap gap-1">
             {detail.accounts.map((account) => (
               <li key={account}>
-                <button type="button" className="text-xs text-blue-700 underline" onClick={() => onPick(account)}>{account}</button>
+                {onPick
+                  ? <button type="button" className="text-xs text-blue-700 underline" onClick={() => onPick(account)}>{account}</button>
+                  : <span className="text-xs">{account}</span>}
               </li>
             ))}
           </ul>
@@ -135,6 +137,17 @@ function Details({
       )}
       {detail.out_of_scope_count > 0 && (
         <p className="text-xs text-slate-500">{detail.out_of_scope_count} more outside your Portfolio</p>
+      )}
+      {detail.records && detail.records.length > 0 && (
+        <div>
+          <h3 className="text-xs font-semibold text-slate-500">Associated records</h3>
+          {detail.records.map((r) => (
+            <details key={r.kind + r.source_ref} className="border-t border-slate-100 py-1 text-xs">
+              <summary className="cursor-pointer">{label(r.kind)} {r.source_ref}</summary>
+              <pre className="mt-1 overflow-x-auto rounded bg-slate-50 p-2">{JSON.stringify(r.data, null, 2)}</pre>
+            </details>
+          ))}
+        </div>
       )}
     </div>
   )
