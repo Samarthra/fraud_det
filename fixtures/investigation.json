@@ -136,7 +136,8 @@
       ],
       "verification": "verified",
       "verification_errors": []
-    }
+    },
+    "replay_available": false
   },
   "investigation": {
     "id": "INV-1",
