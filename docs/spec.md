@@ -415,7 +415,7 @@ Person A runs `python -m evals.run` from `backend/app`. It works on a temporary 
 - A plain sequential loop runs each case. `run_experiment` creates a separate empty trace for each case, so it isn't used.
 - Each check is deterministic code against `ground_truth`, reported with `create_score` on the Investigation's seeded trace.
 - It runs once, at about 14:15, and writes `evals/results/latest.json`, which `GET /evals/latest` serves. Results are not read back through the Langfuse API.
-- The screen never starts an eval.
+- The **Run evals** button on the Evaluations screen starts the same run after a confirmation, shows progress, and refuses a second run while one is going. `python -m evals.run` still works.
 - Someone checks the Sarvam credit balance before the run.
 
 ### Evaluations screen

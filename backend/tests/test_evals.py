@@ -99,7 +99,9 @@ def test_suite_counts_every_case_and_keeps_failures():
         store.add_evidence(investigation_id, "alert", "A1", {})
         store.save_report(investigation_id, report())
 
-    run = run_suite(FakeSource(), 2, investigate=always_suspicious)
+    seen = []
+    run = run_suite(FakeSource(), 2, investigate=always_suspicious, on_case=lambda *a: seen.append(a))
+    assert seen[-1][:2] == (13, 13) and seen[0][0] == 0
     scores = {s.name: s for s in run.scenarios}
     assert scores["account_takeover"].correct == 2 and scores["false_positive"].correct == 0
     assert not scores["false_positive"].passed

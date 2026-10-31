@@ -11,3 +11,4 @@ dist/
 backend/app/evals/results/rehearsal*
 *.db-wal
 *.db-shm
+backend/app/evals/results/progress.json

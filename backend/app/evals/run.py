@@ -1,6 +1,7 @@
 """Run from backend/app: python -m evals.run [--source fake] [--repeats 10]"""
 
 import argparse
+import json
 import subprocess
 import sys
 import time
@@ -23,6 +24,7 @@ from .metrics import GATES, scenario_score
 
 RESULTS = Path(__file__).parent / "results" / "latest.json"
 REHEARSAL = RESULTS.with_name("rehearsal.json")  # never served to the screen
+PROGRESS = RESULTS.with_name("progress.json")
 COST_PER_RUN_INR = 0.20
 NOTICE = (
     "Measured on synthetic data written by the team. "
@@ -43,6 +45,13 @@ class Source(Protocol):
 
 
 Investigate = Callable[[str, AnalystScope, AgentStore], None]
+
+
+def write_progress(done: int, total: int, current: str, last_error: str | None = None) -> None:
+    PROGRESS.parent.mkdir(exist_ok=True)
+    PROGRESS.write_text(
+        json.dumps({"done": done, "total": total, "current": current, "last_error": last_error})
+    )
 
 
 def run_case(
@@ -79,28 +88,44 @@ def run_case(
     )
 
 
-def run_suite(source: Source, repeats: int, investigate: Investigate = run_investigation) -> EvalRun:
+def run_suite(
+    source: Source,
+    repeats: int,
+    investigate: Investigate = run_investigation,
+    on_case: Callable[[int, int, str], None] = lambda done, total, current: None,
+) -> EvalRun:
     run_id = datetime.now(timezone.utc).strftime("%H%M%S")
     scope = source.scope
+    cases_to_hold = source.held_out()
+    total = repeats * len(GATES) + len(cases_to_hold) + 3 * len(PAYLOADS)
+    finished = 0
+
+    def tracked(case_id: str, *args, **kwargs) -> EvalCaseResult:
+        nonlocal finished
+        on_case(finished, total, case_id)
+        result = run_case(run_id, case_id, *args, investigate=investigate, **kwargs)
+        finished += 1
+        on_case(finished, total, case_id)
+        return result
+
     expected: dict[str, Assessment] = {
         "account_takeover": "suspicious",
         "false_positive": "not_suspicious",
     }
     scenarios = {
         name: [
-            run_case(run_id, f"{name}-{i}", name, expected[name], source.scenario(name), scope,
-                     investigate=investigate)
+            tracked(f"{name}-{i}", name, expected[name], source.scenario(name), scope)
             for i in range(repeats)
         ]
         for name in GATES
     }
     held_out = [
-        run_case(run_id, case_id, "held_out", want, store, scope, investigate=investigate)
-        for case_id, store, want in source.held_out()
+        tracked(case_id, "held_out", want, store, scope)
+        for case_id, store, want in cases_to_hold
     ]
     injection = [
-        run_case(run_id, f"{name}-{i}", "injection", "suspicious", source.poisoned(field, text),
-                 scope, injection=True, investigate=investigate)
+        tracked(f"{name}-{i}", "injection", "suspicious", source.poisoned(field, text), scope,
+                injection=True)
         for name, (field, text) in PAYLOADS.items()
         for i in range(3)
     ]
@@ -146,7 +171,12 @@ def main() -> None:
         from .db_source import DbSource
 
         source, out = DbSource(), RESULTS
-    result = run_suite(source, args.repeats)
+    write_progress(0, 0, "starting")
+    try:
+        result = run_suite(source, args.repeats, on_case=write_progress)
+    except Exception as e:
+        write_progress(0, 0, "failed", f"{type(e).__name__}: {e}")
+        raise
     out.parent.mkdir(exist_ok=True)
     out.write_text(result.model_dump_json(indent=2))
     print(result.model_dump_json(indent=2, exclude={"failures"}))

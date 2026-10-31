@@ -2,6 +2,8 @@
 
 import json
 import os
+import subprocess
+import sys
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -40,6 +42,8 @@ from store import Store, now  # noqa: E402
 
 DB_PATH = os.environ.get("FRAUDLENS_DB", str(Path(__file__).resolve().parents[2] / "fraudlens.db"))
 RESULTS = Path(__file__).resolve().parents[1] / "evals" / "results" / "latest.json"
+PROGRESS = RESULTS.with_name("progress.json")
+APP_DIR = Path(__file__).resolve().parents[1]
 store = Store(DB_PATH)
 
 
@@ -278,6 +282,40 @@ def evals_latest():
     if not RESULTS.exists():
         raise HTTPException(404, "No eval run has been saved yet.")
     return json.loads(RESULTS.read_text())
+
+
+def eval_running() -> bool:
+    return subprocess.run(["pgrep", "-f", "evals[.]run"], capture_output=True).returncode == 0
+
+
+@app.get("/evals/status")
+def evals_status():
+    progress = json.loads(PROGRESS.read_text()) if PROGRESS.exists() else {}
+    return {
+        "running": eval_running(),
+        "done": progress.get("done", 0),
+        "total": progress.get("total", 0),
+        "current": progress.get("current"),
+        "last_error": progress.get("last_error"),
+    }
+
+
+@app.post("/evals/run", status_code=202)
+def evals_run(scope: AnalystScope = Depends(current_scope)):
+    """Separate process, so the run survives an API restart and never blocks a request."""
+    if eval_running():
+        raise HTTPException(409, "An eval run is already in progress.")
+    PROGRESS.parent.mkdir(exist_ok=True)
+    PROGRESS.write_text(json.dumps({"done": 0, "total": 0, "current": "starting"}))
+    subprocess.Popen(
+        [sys.executable, "-m", "evals.run"],
+        cwd=APP_DIR,
+        start_new_session=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    store.audit("eval_started", analyst_id=scope.analyst_id)
+    return {"started": True}
 
 
 @app.get("/audit")

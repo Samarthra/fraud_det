@@ -1,20 +1,80 @@
-import { useEffect, useState } from 'react'
-import { ApiError, api, type EvalRun } from '../api'
-import { Badge, Card, ErrorNote, Stat, label, when } from '../ui'
+import { useCallback, useEffect, useState } from 'react'
+import { ApiError, api, type EvalRun, type EvalStatus } from '../api'
+import { Badge, Button, Card, ErrorNote, Stat, label, when } from '../ui'
 
+const POLL_MS = 3000
 const percent = (value: number) => `${Math.round(value * 100)}%`
 
 export default function Evaluations() {
   const [run, setRun] = useState<EvalRun | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    api.evals().then(setRun).catch((e) => setError(e instanceof ApiError && e.status === 404 ? 'No eval run has been saved yet.' : e.message))
+  const [status, setStatus] = useState<EvalStatus | null>(null)
+  const [wasRunning, setWasRunning] = useState(false)
+
+  const loadRun = useCallback(() => {
+    api.evals()
+      .then((r) => {
+        setRun(r)
+        setError(null)
+      })
+      .catch((e) => setError(e instanceof ApiError && e.status === 404 ? 'No eval run has been saved yet.' : e.message))
   }, [])
+
+  useEffect(loadRun, [loadRun])
+
+  useEffect(() => {
+    let stop = false
+    async function poll() {
+      while (!stop) {
+        const current = await api.evalStatus()
+        if (stop) return
+        setStatus(current)
+        setWasRunning((before) => {
+          if (before && !current.running) loadRun()
+          return current.running
+        })
+        await new Promise((resolve) => setTimeout(resolve, POLL_MS))
+      }
+    }
+    poll().catch(() => undefined)
+    return () => {
+      stop = true
+    }
+  }, [loadRun])
+
+  async function start() {
+    if (!window.confirm('Run all evals? This makes live Sarvam calls, takes about 25 minutes, and costs about ₹10.')) return
+    try {
+      await api.runEvals()
+      setWasRunning(true)
+      setStatus(await api.evalStatus())
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
+  const running = Boolean(status?.running || wasRunning)
+  const share = status && status.total ? Math.round((status.done / status.total) * 100) : 0
 
   return (
     <>
-      <h1 className="text-xl font-semibold">Evaluations</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold">Evaluations</h1>
+        <Button primary disabled={running} onClick={start}>{running ? 'Eval running…' : 'Run evals'}</Button>
+      </div>
+      {running && (
+        <Card title="Eval in progress">
+          <p className="text-sm text-slate-600">
+            {status?.total ? `${status.done} of ${status.total} cases done, now on ${status.current}` : 'Starting up. Progress appears once the first case begins.'}
+          </p>
+          <div className="mt-2 h-2 overflow-hidden rounded bg-slate-200">
+            <div className="h-full bg-blue-700" style={{ width: `${share}%` }} />
+          </div>
+          <p className="mt-2 text-xs text-slate-500">You can leave this page. The run continues, and the results below update when it finishes.</p>
+        </Card>
+      )}
+      {!running && status?.last_error && <ErrorNote message={`The last eval run failed: ${status.last_error}`} />}
       <ErrorNote message={error} />
       {run && (
         <>

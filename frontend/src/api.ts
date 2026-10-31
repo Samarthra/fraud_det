@@ -58,6 +58,14 @@ export type EvalRun = {
   failures: EvalCase[]
 }
 
+export type EvalStatus = {
+  running: boolean
+  done: number
+  total: number
+  current: string | null
+  last_error: string | null
+}
+
 export class ApiError extends Error {
   status: number
   constructor(status: number, message: string) {
@@ -126,5 +134,7 @@ export const api = {
   reset: () => post<{ alerts_created: number }>('/demo/reset'),
   rerun: () => post<{ alerts_created: number }>('/detection/rerun'),
   evals: () => request<EvalRun>('/evals/latest'),
+  evalStatus: () => request<EvalStatus>('/evals/status'),
+  runEvals: () => post<{ started: boolean }>('/evals/run'),
   audit: () => request<AuditRow[]>('/audit'),
 }

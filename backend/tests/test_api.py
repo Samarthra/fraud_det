@@ -205,6 +205,23 @@ def test_evals_endpoint(client):
     assert client.get("/evals/latest").json()["commit"] == "abc"
 
 
+def test_eval_starts_once_and_reports_progress(client, monkeypatch):
+    started = []
+    running = [False]
+    monkeypatch.setattr(main, "PROGRESS", main.RESULTS.with_name("progress.json"))
+    monkeypatch.setattr(main, "eval_running", lambda: running[0])
+    monkeypatch.setattr(main.subprocess, "Popen", lambda *a, **k: started.append(a[0]))
+    assert client.get("/evals/status").json()["running"] is False
+    assert client.post("/evals/run").status_code == 401
+    assert client.post("/evals/run", headers=ONE).status_code == 202
+    assert started[0][1:] == ["-m", "evals.run"]
+    running[0] = True
+    assert client.post("/evals/run", headers=ONE).status_code == 409
+    assert len(started) == 1
+    assert client.get("/evals/status").json()["current"] == "starting"
+    assert "eval_started" in [e["event"] for e in client.get("/audit", headers=ONE).json()]
+
+
 def test_sample_loads_once_and_reset_reseeds(client):
     assert client.post("/demo/sample").json()["already_loaded"]
     assert client.post("/demo/reset").json()["alerts_created"] > 0
