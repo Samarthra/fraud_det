@@ -38,13 +38,6 @@ export default function Dashboard() {
   const currentPage = Math.min(page, totalPages)
   const pageRows = alerts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
-  const nodeColor = (type: string) => {
-    if (type === 'account') return '#0f172a'
-    if (type === 'device') return '#2563eb'
-    if (type === 'beneficiary') return '#dc2626'
-    return '#64748b'
-  }
-
   const graphNodes = graph?.nodes ?? []
   const radius = 150
   const cx = 260
@@ -93,25 +86,60 @@ export default function Dashboard() {
       )}
       <Card title="Relationship graph" tooltip="Accounts, devices and beneficiaries connected by transactions.">
         <div className="overflow-x-auto">
-          <svg viewBox="0 0 520 360" className="h-72 w-full min-w-[520px]">
+          <svg viewBox="0 0 520 360" className="h-80 w-full min-w-[520px]">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
+              </marker>
+            </defs>
             {graph?.edges.map((e, i) => {
               const a = nodeMap.get(e.source)
               const b = nodeMap.get(e.target)
               if (!a || !b) return null
-              return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#cbd5e1" strokeWidth="1.5" />
+              return (
+                <line
+                  key={i}
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  stroke="#94a3b8"
+                  strokeWidth="1.5"
+                  markerEnd="url(#arrow)"
+                  opacity="0.7"
+                />
+              )
             })}
-            {positioned.map((n) => (
-              <g key={n.id}>
-                <circle cx={n.x} cy={n.y} r="7" fill={nodeColor(n.type)} />
-                <text x={n.x + 9} y={n.y + 4} fontSize="9" fill="#475569">{n.id}</text>
-              </g>
-            ))}
+            {positioned.map((n) => {
+              if (n.type === 'account') {
+                return (
+                  <g key={n.id}>
+                    <rect x={n.x - 9} y={n.y - 9} width="18" height="18" rx="4" fill="#0f172a" stroke="#fff" strokeWidth="1.5" />
+                    <text x={n.x} y={n.y + 22} fontSize="9" textAnchor="middle" fill="#334155">{n.id}</text>
+                  </g>
+                )
+              }
+              if (n.type === 'device') {
+                return (
+                  <g key={n.id}>
+                    <circle cx={n.x} cy={n.y} r="8" fill="#2563eb" stroke="#fff" strokeWidth="1.5" />
+                    <text x={n.x} y={n.y + 22} fontSize="9" textAnchor="middle" fill="#334155">{n.id}</text>
+                  </g>
+                )
+              }
+              return (
+                <g key={n.id}>
+                  <polygon points={`${n.x},${n.y - 9} ${n.x + 9},${n.y} ${n.x},${n.y + 9} ${n.x - 9},${n.y}`} fill="#dc2626" stroke="#fff" strokeWidth="1.5" />
+                  <text x={n.x} y={n.y + 22} fontSize="9" textAnchor="middle" fill="#334155">{n.id}</text>
+                </g>
+              )
+            })}
           </svg>
         </div>
         <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
-          <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-slate-900" />Account</span>
-          <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-blue-600" />Device</span>
-          <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-red-600" />Beneficiary</span>
+          <span><span className="mr-1 inline-block h-3 w-3 rounded-sm bg-slate-900" />Account</span>
+          <span><span className="mr-1 inline-block h-3 w-3 rounded-full bg-blue-600" />Device</span>
+          <span><span className="mr-1 inline-block h-3 w-3 rotate-45 bg-red-600" />Beneficiary</span>
         </div>
       </Card>
       <Card title={`Alerts (${alerts.length})`} tooltip="Alerts created by detection; click a row for details." action={
