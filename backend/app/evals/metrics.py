@@ -33,7 +33,7 @@ def detection_metrics(rows: Iterable[Mapping[str, Any]]) -> DetectionMetrics:
 
 
 def scenario_score(name: str, results: list[EvalCaseResult]) -> ScenarioScore:
-    correct = sum(r.assessment == r.expected for r in results)
+    correct = sum(r.passed for r in results)
     gate = GATES[name]
     # Scaled, so a smaller rehearsal run is judged by the same rate.
     return ScenarioScore(

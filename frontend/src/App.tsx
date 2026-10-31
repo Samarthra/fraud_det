@@ -12,6 +12,7 @@ import Governance from './pages/Governance'
 import Upload from './pages/Upload'
 import Login from './pages/Login'
 
+const RETRY_MS = 2000
 const NAV = [
   ['upload', 'Upload'],
   ['dashboard', 'Dashboard'],
@@ -47,7 +48,10 @@ export default function App() {
   const [version, setVersion] = useState(0)
 
   useEffect(() => {
-    api.analysts().then(setAnalysts).catch(() => setAnalysts([]))
+    let timer: ReturnType<typeof setTimeout>
+    const load = () => api.analysts().then(setAnalysts).catch(() => { timer = setTimeout(load, RETRY_MS) })
+    load()
+    return () => clearTimeout(timer)
   }, [])
 
   const refresh = () => setVersion((v) => v + 1)

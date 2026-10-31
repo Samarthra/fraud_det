@@ -124,7 +124,13 @@ def users():
 async def ingest(dataset: str, file: UploadFile, scope: AnalystScope = Depends(current_scope)):
     content = await file.read()
     try:
-        rows, result = check_file(dataset, file.filename or "upload", content, store.known_ids())
+        rows, result = check_file(
+            dataset,
+            file.filename or "upload",
+            content,
+            store.known_ids(scope.portfolio),
+            scope.portfolio,
+        )
     except FileRejected as e:
         store.audit("file_rejected", analyst_id=scope.analyst_id, filename=file.filename, reason=str(e))
         raise HTTPException(422, str(e)) from e
@@ -150,8 +156,8 @@ def template(dataset: str):
 
 
 @app.post("/demo/sample")
-def sample():
-    if store.known_ids()["account_id"]:
+def sample(scope: AnalystScope = Depends(current_scope)):
+    if store.known_ids(scope.portfolio)["account_id"]:
         return {"alerts_created": 0, "already_loaded": True}
     return {"alerts_created": load_sample(store), "already_loaded": False}
 
@@ -166,9 +172,12 @@ def sample_file():
 
 
 @app.post("/demo/reset")
-def reset():
+def reset(scope: AnalystScope = Depends(current_scope)):
+    """Clears demo data. The audit trail survives, and records who reset."""
     store.reset()
-    return {"alerts_created": load_sample(store)}
+    created = load_sample(store)
+    store.audit("demo_reset", analyst_id=scope.analyst_id)
+    return {"alerts_created": created}
 
 
 @app.post("/detection/rerun")
@@ -343,7 +352,7 @@ def evals_run(scope: AnalystScope = Depends(current_scope)):
 
 @app.get("/audit")
 def audit(scope: AnalystScope = Depends(current_scope)):
-    rows = store.audit_trail()
+    rows = store.audit_trail(scope.portfolio)
     for row in rows:
         investigation_id = row["details"].get("investigation_id")
         row["trace_url"] = store.trace_url(investigation_id) if investigation_id else None

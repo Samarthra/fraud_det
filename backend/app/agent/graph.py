@@ -34,6 +34,7 @@ class InvestigationState(TypedDict, total=False):
     verification_errors: list[str]
     limitations: list[str]
     attempt: int  # 0 or 1
+    report: Report
 
 
 Gather = Callable[[str, AnalystScope, str, RunnableConfig], list[str]]
@@ -166,7 +167,7 @@ def build_graph(store: AgentStore, gather: Gather, synthesise: Synthesise):
         store.save_report(state["investigation_id"], saved)
         store.audit("report_saved", investigation_id=state["investigation_id"])
         step(state, "report", "stage_finished", "Report saved")
-        return {}
+        return {"report": saved}  # becomes this stage's output in the trace
 
     graph = StateGraph(InvestigationState)
     for name, node in [

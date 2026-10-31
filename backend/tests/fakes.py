@@ -81,6 +81,7 @@ class FakeStore:
         self.beneficiaries = {
             "BEN-7001": {"beneficiary_id": "BEN-7001", "name": "R K Traders", "first_paid": "2026-10-26"},
             "BEN-7002": {"beneficiary_id": "BEN-7002", "name": "S Mehta", "first_paid": "2026-10-31"},
+            "BEN-OUT": {"beneficiary_id": "BEN-OUT", "name": "Other", "first_paid": "2026-10-01"},
         }
         self.payments = {
             "BEN-7001": [
@@ -88,6 +89,7 @@ class FakeStore:
                 for i, a in enumerate(["ACC-10042", "ACC-10311", "ACC-10388", "ACC-60001", "ACC-60002", "ACC-60003"], 48000)
             ],
             "BEN-7002": [{"account_id": "ACC-20017", "transaction_id": "TXN-50002", "portfolio": "p1"}],
+            "BEN-OUT": [{"account_id": "ACC-60001", "transaction_id": "TXN-60000", "portfolio": "p2"}],
         }
 
     def get_alert_for_investigation(self, investigation_id): return self.alert
@@ -98,6 +100,7 @@ class FakeStore:
     def get_device(self, device_id): return self.devices.get(device_id)
     def get_beneficiary(self, beneficiary_id): return self.beneficiaries.get(beneficiary_id)
     def beneficiary_payments(self, beneficiary_id, days=7): return self.payments.get(beneficiary_id, [])
+    def beneficiary_portfolios(self, beneficiary_id): return {p["portfolio"] for p in self.payments.get(beneficiary_id, [])}
 
     def append_step(self, investigation_id, stage, type, summary, evidence_ids=()):
         self.steps.append(Step(seq=len(self.steps) + 1, stage=stage, type=type, summary=summary,

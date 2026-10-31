@@ -17,6 +17,8 @@ def check_case(report: Report | None, expected: str) -> list[str]:
         return ["No usable report."]
     if report.assessment != expected:
         return [f"Assessment was {report.assessment}, expected {expected}."]
+    if report.verification != "verified":
+        return ["Report was Unverified."]
     return []
 
 

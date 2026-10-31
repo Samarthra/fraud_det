@@ -67,6 +67,7 @@ def verify(draft: ReportDraft, evidence: list[Evidence]) -> list[str]:
         errors.append("no_action cannot be recommended on a suspicious assessment.")
     if not draft.findings:
         errors.append("The report has no findings.")
+    errors += [f"Summary: {e}" for e in check_statement(draft.summary, evidence)]
     for n, finding in enumerate(draft.findings, start=1):
         if not finding.evidence_ids:
             errors.append(f"Finding {n} cites no Evidence.")

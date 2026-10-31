@@ -8,7 +8,7 @@ from tools import build_tools
 
 
 def run_tool_denials(
-    store: AgentStore, scope: AnalystScope, account_id: str, device_id: str
+    store: AgentStore, scope: AnalystScope, account_id: str, device_id: str, beneficiary_id: str
 ) -> tuple[int, list[str]]:
     tools = {t.name: t for t in build_tools(store, "denial-tests", scope)}
     cases = [
@@ -16,6 +16,8 @@ def run_tool_denials(
         ("get_account", {"account_id": account_id}),
         ("get_account_events", {"account_id": account_id}),
         ("get_device", {"device_id": device_id}),
+        ("get_beneficiary", {"beneficiary_id": beneficiary_id}),
+        ("analyze_relationships", {"beneficiary_id": beneficiary_id}),
     ]
     failures = []
     for name, args in cases:

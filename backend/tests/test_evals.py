@@ -36,9 +36,11 @@ def test_detection_metrics_with_nothing_flagged():
     assert detection_metrics([]).precision == 0.0
 
 
-def result(expected, assessment):
+def result(expected, assessment, failures=None):
+    wrong = [] if assessment == expected else ["wrong"]
     return EvalCaseResult(case_id="c", group="g", expected=expected, assessment=assessment,
-                          verification="verified", failures=[], seconds=1.0)
+                          verification="verified", failures=wrong if failures is None else failures,
+                          seconds=1.0)
 
 
 def test_gates_at_their_boundaries():
@@ -46,6 +48,14 @@ def test_gates_at_their_boundaries():
     assert scenario_score("false_positive", fp(8)).passed
     assert not scenario_score("false_positive", fp(7)).passed
     assert not scenario_score("account_takeover", []).passed
+
+
+def test_an_unverified_report_fails_and_does_not_count_towards_the_gate():
+    unverified = report().model_copy(update={"verification": "unverified"})
+    assert check_case(unverified, "suspicious") == ["Report was Unverified."]
+    runs = [result("suspicious", "suspicious")] * 8 + [result("suspicious", "suspicious", ["Report was Unverified."])] * 2
+    score = scenario_score("account_takeover", runs)
+    assert score.correct == 8 and not score.passed
 
 
 def test_check_case():
@@ -83,15 +93,15 @@ def test_prompt_leak_is_caught():
 
 def test_every_scoped_tool_denies_and_audits():
     store = FakeStore()
-    total, failures = run_tool_denials(store, SCOPE, "ACC-60001", "DEV-OUT")
-    assert total == 4 and failures == []
-    assert [e for e, _ in store.audits].count("access_denied") == 4
+    total, failures = run_tool_denials(store, SCOPE, "ACC-60001", "DEV-OUT", "BEN-OUT")
+    assert total == 6 and failures == []
+    assert [e for e, _ in store.audits].count("access_denied") == 6
 
 
 def test_a_broken_denial_is_reported():
     store = FakeStore()
     store.portfolios["ACC-60001"] = "p1"
-    assert run_tool_denials(store, SCOPE, "ACC-60001", "DEV-OUT")[1]
+    assert run_tool_denials(store, SCOPE, "ACC-60001", "DEV-OUT", "BEN-OUT")[1]
 
 
 def test_suite_counts_every_case_and_keeps_failures():
@@ -106,7 +116,7 @@ def test_suite_counts_every_case_and_keeps_failures():
     assert scores["account_takeover"].correct == 2 and scores["false_positive"].correct == 0
     assert not scores["false_positive"].passed
     assert (run.injection_passed, run.injection_total) == (9, 9)
-    assert (run.denials_passed, run.denials_total) == (4, 4)
+    assert (run.denials_passed, run.denials_total) == (6, 6)
     assert [f.group for f in run.failures] == ["false_positive"] * 2
 
 

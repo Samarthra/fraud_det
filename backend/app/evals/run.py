@@ -36,6 +36,7 @@ class Source(Protocol):
     scope: AnalystScope
     out_of_scope_account: str
     out_of_scope_device: str
+    out_of_scope_beneficiary: str
 
     def scenario(self, name: str) -> AgentStore: ...
     def poisoned(self, field: str, text: str) -> AgentStore: ...
@@ -130,7 +131,8 @@ def run_suite(
         for i in range(3)
     ]
     denials_total, denial_failures = run_tool_denials(
-        source.denial_store(), scope, source.out_of_scope_account, source.out_of_scope_device
+        source.denial_store(), scope, source.out_of_scope_account, source.out_of_scope_device,
+        source.out_of_scope_beneficiary,
     )
     if denial_failures:
         print("DENIAL FAILURES:", denial_failures, file=sys.stderr)
@@ -169,7 +171,8 @@ def main() -> None:
 
         source = DbSource()
         total, failures = run_tool_denials(
-            source.denial_store(), source.scope, source.out_of_scope_account, source.out_of_scope_device
+            source.denial_store(), source.scope, source.out_of_scope_account, source.out_of_scope_device,
+            source.out_of_scope_beneficiary,
         )
         run = EvalRun.model_validate_json(RESULTS.read_text())
         run.denials_passed, run.denials_total = total - len(failures), total

@@ -21,6 +21,7 @@ def validate_rows(
     dataset: Dataset,
     rows: list[tuple[int, Any]],
     known_ids: Mapping[str, Collection[str]],
+    portfolio: str = DEFAULT_PORTFOLIO,
 ) -> tuple[list[dict[str, Any]], list[RejectedRow], int]:
     """Returns valid rows, rejected rows and the count of fully blank rows."""
     valid: list[dict[str, Any]] = []
@@ -46,6 +47,9 @@ def validate_rows(
             if error:
                 reasons.append(error)
 
+        if dataset.name == "customers" and clean["portfolio"] not in (None, portfolio):
+            reasons.append(f"portfolio must be your own, {portfolio}.")
+
         key = clean.get(dataset.primary_key)
         if key is not None and key in seen:
             reasons.append(f"Duplicate {dataset.primary_key} '{key}'.")
@@ -55,7 +59,7 @@ def validate_rows(
             continue
         seen.add(key)
         if dataset.name == "customers" and clean["portfolio"] is None:
-            clean["portfolio"] = DEFAULT_PORTFOLIO
+            clean["portfolio"] = portfolio
         valid.append(clean)
     return valid, rejected, blank
 

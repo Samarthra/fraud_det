@@ -7,6 +7,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from statistics import median
 from typing import Any, Sequence
+from uuid import uuid4
 
 from contracts import (
     Alert,
@@ -67,7 +68,7 @@ CREATE TABLE IF NOT EXISTS audit (seq INTEGER PRIMARY KEY AUTOINCREMENT, event T
 """
 DATA_TABLES = (
     "accounts transactions logins loan_applications account_events ground_truth alerts cases "
-    "decisions investigations evidence steps follow_ups audit counters baseline"
+    "decisions investigations evidence steps follow_ups counters baseline"
 ).split()
 COLUMNS = {
     "customers": ("accounts", "account_id customer_id name phone email address onboarded_at portfolio"),
@@ -179,7 +180,7 @@ class Store:
         """Only the eval runner calls this. No tool or route reads labels."""
         return self._all("SELECT * FROM ground_truth")
 
-    def known_ids(self) -> dict[str, set[str]]:
+    def known_ids(self, portfolio: str | None = None) -> dict[str, set[str]]:
         def ids(sql: str) -> set[str]:
             return {next(iter(r.values())) for r in self._all(sql)}
 
@@ -189,6 +190,14 @@ class Store:
             "transaction_id": ids("SELECT transaction_id FROM transactions"),
             "login_id": ids("SELECT login_id FROM logins"),
             "application_id": ids("SELECT application_id FROM loan_applications"),
+            "own_account_id": {
+                r["account_id"]
+                for r in self._all("SELECT account_id FROM accounts WHERE portfolio=?", portfolio)
+            },
+            "own_customer_id": {
+                r["customer_id"]
+                for r in self._all("SELECT customer_id FROM accounts WHERE portfolio=?", portfolio)
+            },
         }
 
     def detection_inputs(self) -> dict[str, list[dict[str, Any]]]:
@@ -275,6 +284,14 @@ class Store:
             "first_paid": min(r["timestamp"] for r in rows),
             "payment_count": len(rows),
         }
+
+    def beneficiary_portfolios(self, beneficiary_id: str) -> set[str]:
+        rows = self._all(
+            "SELECT DISTINCT a.portfolio FROM transactions t JOIN accounts a USING (account_id) "
+            "WHERE t.beneficiary_id=?",
+            beneficiary_id,
+        )
+        return {r["portfolio"] for r in rows}
 
     def beneficiary_payments(self, beneficiary_id: str, days: int = 7) -> list[dict[str, Any]]:
         latest = self._one("SELECT MAX(timestamp) AS t FROM transactions")["t"]
@@ -413,7 +430,8 @@ class Store:
     # Investigations
     def start_investigation(self, case_id: str) -> str:
         with self.lock:
-            investigation_id = self._next_id("investigations", "INV")
+            # Traces are seeded from this ID, so it must stay unique across demo resets.
+            investigation_id = f"{self._next_id('investigations', 'INV')}-{uuid4().hex[:6]}"
             self._run(
                 "INSERT INTO investigations (id, case_id, status) VALUES (?,?,'running')",
                 investigation_id,
@@ -602,7 +620,19 @@ class Store:
         row.answer, row.evidence_ids, row.verification = answer, list(evidence_ids), verification
         self._run("UPDATE follow_ups SET body=? WHERE id=?", row.model_dump_json(), follow_up_id)
 
+    def _audit_portfolio(self, details: dict[str, Any]) -> str | None:
+        analyst = self.analyst(details.get("analyst_id"))
+        if analyst:
+            return analyst.portfolio
+        row = self._one(
+            "SELECT a.portfolio FROM investigations i JOIN cases c ON c.id=i.case_id "
+            "JOIN accounts a ON a.account_id=c.account_id WHERE i.id=?",
+            details.get("investigation_id"),
+        )
+        return row["portfolio"] if row else None
+
     def audit(self, event: str, **details: Any) -> None:
+        details["portfolio"] = self._audit_portfolio(details)
         self._run(
             "INSERT INTO audit (event, at, details) VALUES (?,?,?)",
             event,
@@ -610,6 +640,7 @@ class Store:
             json.dumps(details, default=str),
         )
 
-    def audit_trail(self) -> list[dict[str, Any]]:
-        rows = self._all("SELECT * FROM audit ORDER BY seq DESC LIMIT 500")
-        return [{**r, "details": json.loads(r["details"])} for r in rows]
+    def audit_trail(self, portfolio: str) -> list[dict[str, Any]]:
+        rows = self._all("SELECT * FROM audit ORDER BY seq DESC")
+        parsed = [{**r, "details": json.loads(r["details"])} for r in rows]
+        return [r for r in parsed if r["details"].get("portfolio") == portfolio][:500]

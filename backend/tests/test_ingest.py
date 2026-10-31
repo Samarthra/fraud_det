@@ -6,7 +6,8 @@ from openpyxl import Workbook
 
 from ingest import DATASETS, FileRejected, check_file, template_csv
 
-KNOWN = {"account_id": {"ACC-1", "ACC-2"}, "customer_id": {"CUS-1"}, "transaction_id": {"TXN-9"}}
+KNOWN = {"account_id": {"ACC-1", "ACC-2", "ACC-8"}, "own_account_id": {"ACC-1", "ACC-2"},
+         "own_customer_id": {"CUS-1"}, "transaction_id": {"TXN-9"}}
 HEADER = "transaction_id,account_id,beneficiary_id,beneficiary_name,amount,timestamp,channel,status"
 GOOD = "TXN-1,ACC-1,BEN-1,Asha,500.50,2026-10-30T10:00:00,mobile,completed"
 
@@ -107,6 +108,22 @@ def test_json_list_and_wrapper():
 def test_unreadable_files_are_rejected(filename, content):
     with pytest.raises(FileRejected):
         check(content, filename)
+
+
+def test_a_row_cannot_link_to_another_portfolios_account():
+    row = "TXN-1,ACC-8,BEN-1,Asha,5,2026-10-30,mobile,completed"
+    rows, result = check(txns(row))
+    assert rows == [] and "Unknown account_id" in result.rejected[0].reasons[0]
+
+
+def test_new_accounts_land_in_the_uploaders_portfolio_only():
+    header = "account_id,customer_id,name,phone,email,address,onboarded_at,portfolio"
+    blank = "ACC-3,CUS-3,A,1,a@x.test,Pune,2024-01-01,"
+    other = "ACC-4,CUS-4,A,1,a@x.test,Pune,2024-01-01,portfolio-1"
+    content = "\n".join([header, blank, other]).encode()
+    rows, result = check_file("customers", "c.csv", content, KNOWN, "portfolio-2")
+    assert rows[0]["portfolio"] == "portfolio-2"
+    assert "your own" in result.rejected[0].reasons[0]
 
 
 def test_portfolio_defaults_and_is_validated():

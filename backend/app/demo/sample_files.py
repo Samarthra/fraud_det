@@ -4,6 +4,7 @@ import csv
 import io
 from datetime import datetime, timedelta
 
+from demo.generator import generate
 from ingest import DATASETS
 
 NOTES = ["Missing amount", "Unknown account", "Amount is not a number", "Bad date"]
@@ -22,12 +23,14 @@ def bad_rows_csv(now: datetime | None = None) -> str:
             "description": "Uploaded batch",
         }
 
-    rows = [row(i, f"ACC-{30000 + i}", 1500 + i * 25) for i in range(1, 9)]
+    # Analyst 1's accounts, because uploads can only touch your own Portfolio.
+    own = [a["account_id"] for a in generate(now).customers if a["portfolio"] == "portfolio-1"]
+    rows = [row(i, own[i], 1500 + i * 25) for i in range(1, 9)]
     rows += [
-        row(9, "ACC-30001", ""),
+        row(9, own[1], ""),
         row(10, "ACC-99999", 1200),
-        row(11, "ACC-30002", "twelve hundred"),
-        row(12, "ACC-30003", 1200, "31/10/2026"),
+        row(11, own[2], "twelve hundred"),
+        row(12, own[3], 1200, "31/10/2026"),
     ]
     out = io.StringIO()
     writer = csv.DictWriter(out, columns)

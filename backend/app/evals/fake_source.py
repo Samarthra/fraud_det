@@ -13,6 +13,7 @@ class FakeSource:
     scope = AnalystScope(analyst_id="a1", portfolio="p1")
     out_of_scope_account = "ACC-60001"
     out_of_scope_device = "DEV-OUT"
+    out_of_scope_beneficiary = "BEN-OUT"
 
     def scenario(self, name):
         return FakeStore(TAKEOVER if name == "account_takeover" else BENIGN)

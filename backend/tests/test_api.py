@@ -78,7 +78,7 @@ def test_portfolio_scope_on_every_case_route(client):
         ("post", f"/investigations/{investigation}/followups", {"question": "q"}),
     ]:
         assert client.request(method, path, headers=TWO, json=body).status_code == 403, path
-    denied = [e for e in client.get("/audit", headers=ONE).json() if e["event"] == "access_denied"]
+    denied = [e for e in client.get("/audit", headers=TWO).json() if e["event"] == "access_denied"]
     assert len(denied) == 6
 
 
@@ -223,8 +223,8 @@ def test_eval_starts_once_and_reports_progress(client, monkeypatch):
 
 
 def test_sample_loads_once_and_reset_reseeds(client):
-    assert client.post("/demo/sample").json()["already_loaded"]
-    assert client.post("/demo/reset").json()["alerts_created"] > 0
+    assert client.post("/demo/sample", headers=ONE).json()["already_loaded"]
+    assert client.post("/demo/reset", headers=ONE).json()["alerts_created"] > 0
     assert client.get("/analysts").json()[0]["id"] == "analyst-1"
 
 
@@ -237,3 +237,40 @@ def test_eval_source_uses_real_data():
     assert source.scenario("account_takeover").get_alert_for_investigation("EVAL-1").transaction_id == "TXN-50001"
     store = source.poisoned("description", "payload")
     assert store.get_transactions("ACC-10042")[0]["description"] == "payload"
+
+
+def test_investigation_ids_stay_unique_across_resets():
+    store = Store()
+    load_sample(store)
+    case_id = store.alerts("portfolio-1")[0].case_id or store.cases("portfolio-1")[0].id
+    first = store.start_investigation(case_id)
+    store.reset()
+    load_sample(store)
+    assert store.start_investigation(store.cases("portfolio-1")[0].id) != first
+
+
+def test_audit_is_scoped_to_the_analysts_portfolio(client):
+    case_id = takeover(client)["case_id"]
+    client.post(f"/cases/{case_id}/decision", headers=ONE, json={"decision": "escalated", "note": "private note"})
+    client.post(f"/cases/{case_id}/investigation", headers=ONE)
+    assert "private note" in str(client.get("/audit", headers=ONE).json())
+    other = str(client.get("/audit", headers=TWO).json())
+    assert "private note" not in other and case_id not in other and "tool_call" not in other
+
+
+def test_upload_cannot_touch_another_portfolio(client):
+    account = main.store._one("SELECT account_id FROM accounts WHERE portfolio='portfolio-1'")["account_id"]
+    head = "transaction_id,account_id,beneficiary_id,beneficiary_name,amount,timestamp,channel,status"
+    row = f"TXN-77777,{account},BEN-1,X,500,2026-10-30,web,completed"
+    res = client.post("/ingest/transactions", headers=TWO, files={"file": ("b.csv", io.BytesIO(f"{head}\n{row}".encode()), "text/csv")}).json()
+    assert res["loaded"] == 0 and "Unknown account_id" in res["rejected"][0]["reasons"][0]
+
+
+def test_reset_needs_an_analyst_and_keeps_the_audit_trail(client):
+    assert client.post("/demo/reset").status_code == 401
+    assert client.post("/demo/sample").status_code == 401
+    case_id = takeover(client)["case_id"]
+    client.post(f"/cases/{case_id}/decision", headers=ONE, json={"decision": "escalated"})
+    client.post("/demo/reset", headers=ONE)
+    events = [e["event"] for e in client.get("/audit", headers=ONE).json()]
+    assert "decision_recorded" in events and "demo_reset" in events
