@@ -65,3 +65,13 @@ def test_beneficiary_and_relationship_records_stay_separate():
     out = json.loads(t["analyze_relationships"].invoke({"beneficiary_id": "BEN-7001"}))
     assert out[0]["kind"] == "relationship"
     assert [e.kind for e in store.evidence] == ["beneficiary", "relationship"]
+
+
+def test_a_device_shared_across_portfolios_shows_only_in_scope_accounts():
+    store = FakeStore()
+    store.devices["DEV-BOTH"] = {"device_id": "DEV-BOTH", "first_seen": "2026-10-01",
+                                 "accounts": ["ACC-10042", "ACC-60001"]}
+    out = tools(store)["get_device"].invoke({"device_id": "DEV-BOTH"})
+    data = json.loads(out)[0]["data"]
+    assert data["accounts"] == ["ACC-10042"] and data["out_of_scope_count"] == 1
+    assert "ACC-60001" not in out and "ACC-60001" not in str(store.evidence[0].data)
