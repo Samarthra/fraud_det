@@ -308,7 +308,8 @@
     ],
     "trace_url": "https://us.cloud.langfuse.com/project/example/traces/example",
     "is_replay": false,
-    "replay_captured_at": null
+    "replay_captured_at": null,
+    "typology": null
   },
   "steps": [
     {

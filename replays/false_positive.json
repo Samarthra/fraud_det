@@ -1,65 +1,80 @@
 {
-  "captured_at": "2026-10-31T14:56:40+05:30",
-  "commit": "f560b61",
+  "captured_at": "2026-10-31T17:27:52+05:30",
+  "commit": "e7797ec",
   "model": "sarvam-105b",
   "investigation": {
-    "id": "INV-1-615d16",
+    "id": "INV-1-017043",
     "case_id": "CASE-50",
     "status": "complete",
     "report": {
       "assessment": "not_suspicious",
-      "summary": "Alert ALT-166 on account ACC-20017 for transaction TXN-50002 on 2026-10-31 was triggered by a new device, an amount spike, and a new beneficiary. However, the device passed OTP to the registered SIM in the usual city, and the beneficiary was added two days prior and has only been paid by this account. Therefore, the activity has a verified explanation.",
+      "summary": "Alert ALT-172 on account ACC-20017 for transaction TXN-50002 fired three rules (new_device, amount_spike, new_beneficiary), but the evidence shows a verified device change and an established payee. The device DEV-9002 passed OTP to the registered SIM in the usual city Pune (EV-2, EV-18, EV-20), and beneficiary BEN-7002 was added on 2026-10-29T17:27:30+05:30, more than 24 hours before its first payment on 2026-10-31T16:27:30+05:30, and has only been paid by this account (EV-3, EV-15, EV-19, EV-21). No takeover indicators (SIM swap, failed logins, unverified device, password reset, or mule payment) are present.",
       "findings": [
         {
-          "statement": "Alert ALT-166 was generated on 2026-10-31 for account ACC-20017 with risk score 70, category account_takeover.",
+          "statement": "Alert ALT-172 was generated on 2026-10-31T16:27:30+05:30 for account ACC-20017, transaction TXN-50002, with risk score 70, category account_takeover, and rule hits: new_device (DEV-9002 first seen under 24h ago), amount_spike (62000 is over 5× median of 9019), and new_beneficiary (first payment to BEN-7002).",
           "evidence_ids": [
             "EV-1"
           ]
         },
         {
-          "statement": "Transaction TXN-50002 for amount 62000.0 to beneficiary BEN-7002 was completed on 2026-10-31 via mobile channel using device DEV-9002.",
+          "statement": "Device DEV-9002 was enrolled on 2026-10-31T14:27:30+05:30 and passed OTP to the registered SIM in the usual city Pune.",
           "evidence_ids": [
-            "EV-1",
-            "EV-3"
+            "EV-2",
+            "EV-18"
           ]
         },
         {
-          "statement": "The amount of 62000.0 is over 5× the account's median outgoing amount of 9032.005000000001.",
+          "statement": "The typology proof for verified_device_change/ACC-20017/DEV-9002 confirms direction: legitimate, with steps: DEV-9002 enrolled (EVT-48), OTP passed to registered SIM (EVT-48), no failed login in 24h before, no SIM swap in 24h before, no password reset in 24h before.",
           "evidence_ids": [
-            "EV-1",
-            "EV-2"
+            "EV-20"
           ]
         },
         {
-          "statement": "Device DEV-9002 was first seen on account ACC-20017 on 2026-10-31 at 11:56:21+05:30.",
+          "statement": "Beneficiary BEN-7002 (S Mehta) was added on 2026-10-29T17:27:30+05:30.",
           "evidence_ids": [
-            "EV-1",
-            "EV-13"
+            "EV-3",
+            "EV-19"
           ]
         },
         {
-          "statement": "Device DEV-9002 passed OTP to the registered SIM in the usual city Pune at 2026-10-31T11:56:21+05:30.",
+          "statement": "Transaction TXN-50002 for amount 62000.0 to beneficiary BEN-7002 (S Mehta) on 2026-10-31T16:27:30+05:30 was completed via mobile channel using device DEV-9002, with description 'Rent deposit, new flat' and IP country IN.",
           "evidence_ids": [
-            "EV-15"
+            "EV-4"
           ]
         },
         {
-          "statement": "Beneficiary BEN-7002 was added to account ACC-20017 on 2026-10-29 at 14:56:21+05:30, two days before the transaction.",
+          "statement": "The typology proof for established_payee/ACC-20017/BEN-7002 confirms direction: legitimate, with steps: BEN-7002 was added (EVT-49), TXN-50002 pays first-time beneficiary BEN-7002, ₹62,000 (TXN-50002), added at least 24 hours before its first payment, and only this account has paid BEN-7002 (TXN-50002).",
           "evidence_ids": [
-            "EV-16"
+            "EV-21"
           ]
         },
         {
-          "statement": "BEN-7002 has only been paid once, by transaction TXN-50002, and has no out-of-scope payments.",
+          "statement": "BEN-7002's first payment was on 2026-10-31T16:27:30+05:30, with payment_count 1, and the only paying account is ACC-20017 (EV-15, EV-17).",
           "evidence_ids": [
-            "EV-14",
+            "EV-15",
             "EV-17"
+          ]
+        },
+        {
+          "statement": "Account ACC-20017 has median outgoing 30d of 9032.005000000001 (EV-14), and the transaction amount 62000.0 is over 5× the median of 9019 (per alert rule_hits in EV-1).",
+          "evidence_ids": [
+            "EV-1",
+            "EV-14"
+          ]
+        },
+        {
+          "statement": "No takeover indicators are present: no SIM swap, no failed logins, no unverified or foreign new device, no password reset, and no beneficiary paid by many accounts.",
+          "evidence_ids": [
+            "EV-20",
+            "EV-17",
+            "EV-15"
           ]
         }
       ],
       "limitations": [
-        "The description of the transaction is untrusted data and cannot be independently verified.",
-        "No login failure or password reset evidence was provided to confirm account takeover."
+        "The evidence does not include the actual failed login or password reset records, only the typology proof's conclusion that none occurred.",
+        "The typology proofs are computed in code and rely on the underlying event records (EVT-48, EVT-49, TXN-50002) for their derivation.",
+        "Nearly proved: Account takeover on ACC-20017, a compromise signal within 2 hours."
       ],
       "recommended_actions": [
         "no_action"
@@ -70,11 +85,11 @@
     "evidence": [
       {
         "id": "EV-1",
-        "investigation_id": "INV-1-615d16",
+        "investigation_id": "INV-1-017043",
         "kind": "alert",
-        "source_ref": "ALT-166",
+        "source_ref": "ALT-172",
         "data": {
-          "id": "ALT-166",
+          "id": "ALT-172",
           "case_id": "CASE-50",
           "category": "account_takeover",
           "product": "core_banking",
@@ -89,7 +104,7 @@
             {
               "rule": "amount_spike",
               "points": 25,
-              "reason": "62000 is over 5× the median of 8956"
+              "reason": "62000 is over 5× the median of 9019"
             },
             {
               "rule": "new_beneficiary",
@@ -102,29 +117,44 @@
           "transaction_id": "TXN-50002",
           "device_id": "DEV-9002",
           "application_id": null,
-          "created_at": "2026-10-31T13:56:21+05:30"
+          "policy_id": null,
+          "claim_id": null,
+          "created_at": "2026-10-31T16:27:30+05:30"
         },
         "tool_call_id": null,
-        "collected_at": "2026-10-31T14:56:22+05:30"
+        "collected_at": "2026-10-31T17:27:31+05:30"
       },
       {
         "id": "EV-2",
-        "investigation_id": "INV-1-615d16",
-        "kind": "account",
-        "source_ref": "ACC-20017",
+        "investigation_id": "INV-1-017043",
+        "kind": "account_event",
+        "source_ref": "ACC-20017/device_enrolled/2026-10-31T14:27:30+05:30",
         "data": {
           "account_id": "ACC-20017",
-          "customer_id": "CUS-20170",
-          "name": "Tara Bhat",
-          "onboarded_at": "2021-11-01T14:56:21+05:30",
-          "median_outgoing_30d": 9032.005000000001
+          "type": "device_enrolled",
+          "at": "2026-10-31T14:27:30+05:30",
+          "details": "DEV-9002 passed OTP to registered SIM, usual city Pune"
         },
-        "tool_call_id": "call-1",
-        "collected_at": "2026-10-31T14:56:24+05:30"
+        "tool_call_id": "call-2",
+        "collected_at": "2026-10-31T17:27:32+05:30"
       },
       {
         "id": "EV-3",
-        "investigation_id": "INV-1-615d16",
+        "investigation_id": "INV-1-017043",
+        "kind": "account_event",
+        "source_ref": "ACC-20017/beneficiary_added/2026-10-29T17:27:30+05:30",
+        "data": {
+          "account_id": "ACC-20017",
+          "type": "beneficiary_added",
+          "at": "2026-10-29T17:27:30+05:30",
+          "details": "BEN-7002 added"
+        },
+        "tool_call_id": "call-2",
+        "collected_at": "2026-10-31T17:27:32+05:30"
+      },
+      {
+        "id": "EV-4",
+        "investigation_id": "INV-1-017043",
         "kind": "transaction",
         "source_ref": "TXN-50002",
         "data": {
@@ -133,19 +163,19 @@
           "beneficiary_id": "BEN-7002",
           "beneficiary_name": "S Mehta",
           "amount": 62000.0,
-          "timestamp": "2026-10-31T13:56:21+05:30",
+          "timestamp": "2026-10-31T16:27:30+05:30",
           "channel": "mobile",
           "status": "completed",
           "device_id": "DEV-9002",
           "ip_country": "IN",
           "description": "Rent deposit, new flat"
         },
-        "tool_call_id": "call-2",
-        "collected_at": "2026-10-31T14:56:24+05:30"
+        "tool_call_id": "call-1",
+        "collected_at": "2026-10-31T17:27:32+05:30"
       },
       {
-        "id": "EV-4",
-        "investigation_id": "INV-1-615d16",
+        "id": "EV-5",
+        "investigation_id": "INV-1-017043",
         "kind": "transaction",
         "source_ref": "TXN-16053",
         "data": {
@@ -161,12 +191,12 @@
           "ip_country": "IN",
           "description": "Rent"
         },
-        "tool_call_id": "call-2",
-        "collected_at": "2026-10-31T14:56:24+05:30"
+        "tool_call_id": "call-1",
+        "collected_at": "2026-10-31T17:27:32+05:30"
       },
       {
-        "id": "EV-5",
-        "investigation_id": "INV-1-615d16",
+        "id": "EV-6",
+        "investigation_id": "INV-1-017043",
         "kind": "transaction",
         "source_ref": "TXN-16054",
         "data": {
@@ -182,12 +212,12 @@
           "ip_country": "IN",
           "description": "Rent"
         },
-        "tool_call_id": "call-2",
-        "collected_at": "2026-10-31T14:56:24+05:30"
+        "tool_call_id": "call-1",
+        "collected_at": "2026-10-31T17:27:32+05:30"
       },
       {
-        "id": "EV-6",
-        "investigation_id": "INV-1-615d16",
+        "id": "EV-7",
+        "investigation_id": "INV-1-017043",
         "kind": "transaction",
         "source_ref": "TXN-16055",
         "data": {
@@ -203,12 +233,12 @@
           "ip_country": "IN",
           "description": "Rent"
         },
-        "tool_call_id": "call-2",
-        "collected_at": "2026-10-31T14:56:24+05:30"
+        "tool_call_id": "call-1",
+        "collected_at": "2026-10-31T17:27:32+05:30"
       },
       {
-        "id": "EV-7",
-        "investigation_id": "INV-1-615d16",
+        "id": "EV-8",
+        "investigation_id": "INV-1-017043",
         "kind": "transaction",
         "source_ref": "TXN-16056",
         "data": {
@@ -217,19 +247,19 @@
           "beneficiary_id": "BEN-1300",
           "beneficiary_name": "Old landlord",
           "amount": 9045.29,
-          "timestamp": "2026-10-23T15:02:00+05:30",
+          "timestamp": "2026-10-24T15:02:00+05:30",
           "channel": "mobile",
           "status": "completed",
           "device_id": "DEV-2017",
           "ip_country": "IN",
           "description": "Rent"
         },
-        "tool_call_id": "call-2",
-        "collected_at": "2026-10-31T14:56:24+05:30"
+        "tool_call_id": "call-1",
+        "collected_at": "2026-10-31T17:27:32+05:30"
       },
       {
-        "id": "EV-8",
-        "investigation_id": "INV-1-615d16",
+        "id": "EV-9",
+        "investigation_id": "INV-1-017043",
         "kind": "transaction",
         "source_ref": "TXN-16057",
         "data": {
@@ -245,12 +275,12 @@
           "ip_country": "IN",
           "description": "Rent"
         },
-        "tool_call_id": "call-2",
-        "collected_at": "2026-10-31T14:56:24+05:30"
+        "tool_call_id": "call-1",
+        "collected_at": "2026-10-31T17:27:32+05:30"
       },
       {
-        "id": "EV-9",
-        "investigation_id": "INV-1-615d16",
+        "id": "EV-10",
+        "investigation_id": "INV-1-017043",
         "kind": "transaction",
         "source_ref": "TXN-16058",
         "data": {
@@ -266,12 +296,12 @@
           "ip_country": "IN",
           "description": "Rent"
         },
-        "tool_call_id": "call-2",
-        "collected_at": "2026-10-31T14:56:24+05:30"
+        "tool_call_id": "call-1",
+        "collected_at": "2026-10-31T17:27:32+05:30"
       },
       {
-        "id": "EV-10",
-        "investigation_id": "INV-1-615d16",
+        "id": "EV-11",
+        "investigation_id": "INV-1-017043",
         "kind": "transaction",
         "source_ref": "TXN-16059",
         "data": {
@@ -287,12 +317,12 @@
           "ip_country": "IN",
           "description": "Rent"
         },
-        "tool_call_id": "call-2",
-        "collected_at": "2026-10-31T14:56:24+05:30"
+        "tool_call_id": "call-1",
+        "collected_at": "2026-10-31T17:27:32+05:30"
       },
       {
-        "id": "EV-11",
-        "investigation_id": "INV-1-615d16",
+        "id": "EV-12",
+        "investigation_id": "INV-1-017043",
         "kind": "transaction",
         "source_ref": "TXN-16060",
         "data": {
@@ -308,12 +338,12 @@
           "ip_country": "IN",
           "description": "Rent"
         },
-        "tool_call_id": "call-2",
-        "collected_at": "2026-10-31T14:56:24+05:30"
+        "tool_call_id": "call-1",
+        "collected_at": "2026-10-31T17:27:32+05:30"
       },
       {
-        "id": "EV-12",
-        "investigation_id": "INV-1-615d16",
+        "id": "EV-13",
+        "investigation_id": "INV-1-017043",
         "kind": "transaction",
         "source_ref": "TXN-16061",
         "data": {
@@ -329,70 +359,57 @@
           "ip_country": "IN",
           "description": "Rent"
         },
-        "tool_call_id": "call-2",
-        "collected_at": "2026-10-31T14:56:24+05:30"
-      },
-      {
-        "id": "EV-13",
-        "investigation_id": "INV-1-615d16",
-        "kind": "device",
-        "source_ref": "DEV-9002",
-        "data": {
-          "device_id": "DEV-9002",
-          "first_seen": "2026-10-31T11:56:21+05:30",
-          "accounts": [
-            "ACC-20017"
-          ],
-          "out_of_scope_count": 0
-        },
-        "tool_call_id": "call-3",
-        "collected_at": "2026-10-31T14:56:24+05:30"
+        "tool_call_id": "call-1",
+        "collected_at": "2026-10-31T17:27:32+05:30"
       },
       {
         "id": "EV-14",
-        "investigation_id": "INV-1-615d16",
+        "investigation_id": "INV-1-017043",
+        "kind": "account",
+        "source_ref": "ACC-20017",
+        "data": {
+          "account_id": "ACC-20017",
+          "customer_id": "CUS-20170",
+          "name": "Tara Bhat",
+          "onboarded_at": "2021-11-01T17:27:30+05:30",
+          "median_outgoing_30d": 9032.005000000001
+        },
+        "tool_call_id": "call-3",
+        "collected_at": "2026-10-31T17:27:32+05:30"
+      },
+      {
+        "id": "EV-15",
+        "investigation_id": "INV-1-017043",
         "kind": "beneficiary",
         "source_ref": "BEN-7002",
         "data": {
           "beneficiary_id": "BEN-7002",
           "name": "S Mehta",
-          "first_paid": "2026-10-31T13:56:21+05:30",
+          "first_paid": "2026-10-31T16:27:30+05:30",
           "payment_count": 1
         },
-        "tool_call_id": "call-6",
-        "collected_at": "2026-10-31T14:56:24+05:30"
-      },
-      {
-        "id": "EV-15",
-        "investigation_id": "INV-1-615d16",
-        "kind": "account_event",
-        "source_ref": "ACC-20017/device_enrolled/2026-10-31T11:56:21+05:30",
-        "data": {
-          "account_id": "ACC-20017",
-          "type": "device_enrolled",
-          "at": "2026-10-31T11:56:21+05:30",
-          "details": "DEV-9002 passed OTP to registered SIM, usual city Pune"
-        },
-        "tool_call_id": "call-5",
-        "collected_at": "2026-10-31T14:56:24+05:30"
+        "tool_call_id": "call-4",
+        "collected_at": "2026-10-31T17:27:32+05:30"
       },
       {
         "id": "EV-16",
-        "investigation_id": "INV-1-615d16",
-        "kind": "account_event",
-        "source_ref": "ACC-20017/beneficiary_added/2026-10-29T14:56:21+05:30",
+        "investigation_id": "INV-1-017043",
+        "kind": "device",
+        "source_ref": "DEV-9002",
         "data": {
-          "account_id": "ACC-20017",
-          "type": "beneficiary_added",
-          "at": "2026-10-29T14:56:21+05:30",
-          "details": "BEN-7002 added"
+          "device_id": "DEV-9002",
+          "first_seen": "2026-10-31T14:27:30+05:30",
+          "accounts": [
+            "ACC-20017"
+          ],
+          "out_of_scope_count": 0
         },
         "tool_call_id": "call-5",
-        "collected_at": "2026-10-31T14:56:24+05:30"
+        "collected_at": "2026-10-31T17:27:32+05:30"
       },
       {
         "id": "EV-17",
-        "investigation_id": "INV-1-615d16",
+        "investigation_id": "INV-1-017043",
         "kind": "relationship",
         "source_ref": "BEN-7002",
         "data": {
@@ -406,14 +423,212 @@
             "TXN-50002"
           ]
         },
-        "tool_call_id": "call-4",
-        "collected_at": "2026-10-31T14:56:24+05:30"
+        "tool_call_id": "call-6",
+        "collected_at": "2026-10-31T17:27:33+05:30"
+      },
+      {
+        "id": "EV-18",
+        "investigation_id": "INV-1-017043",
+        "kind": "account_event",
+        "source_ref": "EVT-48",
+        "data": {
+          "account_id": "ACC-20017",
+          "type": "device_enrolled",
+          "at": "2026-10-31T14:27:30+05:30",
+          "details": "DEV-9002 passed OTP to registered SIM, usual city Pune",
+          "event_id": "EVT-48",
+          "target_id": "DEV-9002"
+        },
+        "tool_call_id": null,
+        "collected_at": "2026-10-31T17:27:39+05:30"
+      },
+      {
+        "id": "EV-19",
+        "investigation_id": "INV-1-017043",
+        "kind": "account_event",
+        "source_ref": "EVT-49",
+        "data": {
+          "account_id": "ACC-20017",
+          "type": "beneficiary_added",
+          "at": "2026-10-29T17:27:30+05:30",
+          "details": "BEN-7002 added",
+          "event_id": "EVT-49",
+          "target_id": "BEN-7002"
+        },
+        "tool_call_id": null,
+        "collected_at": "2026-10-31T17:27:39+05:30"
+      },
+      {
+        "id": "EV-20",
+        "investigation_id": "INV-1-017043",
+        "kind": "typology",
+        "source_ref": "verified_device_change/ACC-20017/DEV-9002",
+        "data": {
+          "typology": "verified_device_change",
+          "name": "Verified device change",
+          "direction": "legitimate",
+          "account": "ACC-20017",
+          "subject": "DEV-9002",
+          "steps": [
+            {
+              "text": "DEV-9002 enrolled",
+              "record": "EVT-48",
+              "quote": null
+            },
+            {
+              "text": "The record says OTP was passed",
+              "record": "EVT-48",
+              "quote": "passed OTP to registered SIM"
+            },
+            {
+              "text": "No failed login in the 24 hours before",
+              "record": null,
+              "quote": null
+            },
+            {
+              "text": "No SIM swap in the 24 hours before",
+              "record": null,
+              "quote": null
+            },
+            {
+              "text": "No password reset in the 24 hours before",
+              "record": null,
+              "quote": null
+            }
+          ],
+          "derived_from": [
+            "EVT-48",
+            "EVT-48"
+          ]
+        },
+        "tool_call_id": null,
+        "collected_at": "2026-10-31T17:27:39+05:30"
+      },
+      {
+        "id": "EV-21",
+        "investigation_id": "INV-1-017043",
+        "kind": "typology",
+        "source_ref": "established_payee/ACC-20017/BEN-7002",
+        "data": {
+          "typology": "established_payee",
+          "name": "Established payee",
+          "direction": "legitimate",
+          "account": "ACC-20017",
+          "subject": "BEN-7002",
+          "steps": [
+            {
+              "text": "BEN-7002 was added",
+              "record": "EVT-49",
+              "quote": null
+            },
+            {
+              "text": "TXN-50002 pays first-time beneficiary BEN-7002, ₹62,000",
+              "record": "TXN-50002",
+              "quote": null
+            },
+            {
+              "text": "Added at least 24 hours before its first payment",
+              "record": null,
+              "quote": null
+            },
+            {
+              "text": "Only this account has paid BEN-7002",
+              "record": "TXN-50002",
+              "quote": null
+            }
+          ],
+          "derived_from": [
+            "EVT-49",
+            "TXN-50002",
+            "TXN-50002"
+          ]
+        },
+        "tool_call_id": null,
+        "collected_at": "2026-10-31T17:27:39+05:30"
       }
     ],
     "follow_ups": [],
-    "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/797c71461d1ea0e1b77ff7c2fcbf281b",
+    "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/6b80a200df6998f04a88bd8b410ae630",
     "is_replay": false,
-    "replay_captured_at": null
+    "replay_captured_at": null,
+    "typology": {
+      "requirement": "not_suspicious",
+      "proofs": [
+        {
+          "typology": "verified_device_change",
+          "name": "Verified device change",
+          "direction": "legitimate",
+          "account": "ACC-20017",
+          "subject": "DEV-9002",
+          "steps": [
+            {
+              "text": "DEV-9002 enrolled",
+              "record": "EVT-48",
+              "quote": null
+            },
+            {
+              "text": "The record says OTP was passed",
+              "record": "EVT-48",
+              "quote": "passed OTP to registered SIM"
+            },
+            {
+              "text": "No failed login in the 24 hours before",
+              "record": null,
+              "quote": null
+            },
+            {
+              "text": "No SIM swap in the 24 hours before",
+              "record": null,
+              "quote": null
+            },
+            {
+              "text": "No password reset in the 24 hours before",
+              "record": null,
+              "quote": null
+            }
+          ],
+          "evidence_id": "EV-20"
+        },
+        {
+          "typology": "established_payee",
+          "name": "Established payee",
+          "direction": "legitimate",
+          "account": "ACC-20017",
+          "subject": "BEN-7002",
+          "steps": [
+            {
+              "text": "BEN-7002 was added",
+              "record": "EVT-49",
+              "quote": null
+            },
+            {
+              "text": "TXN-50002 pays first-time beneficiary BEN-7002, ₹62,000",
+              "record": "TXN-50002",
+              "quote": null
+            },
+            {
+              "text": "Added at least 24 hours before its first payment",
+              "record": null,
+              "quote": null
+            },
+            {
+              "text": "Only this account has paid BEN-7002",
+              "record": "TXN-50002",
+              "quote": null
+            }
+          ],
+          "evidence_id": "EV-21"
+        }
+      ],
+      "near": [
+        {
+          "typology": "account_takeover",
+          "name": "Account takeover",
+          "account": "ACC-20017",
+          "missing": "a compromise signal within 2 hours"
+        }
+      ]
+    }
   },
   "steps": [
     {
@@ -422,7 +637,7 @@
       "type": "stage_started",
       "summary": "Reading the Alert",
       "evidence_ids": [],
-      "at": "2026-10-31T14:56:22+05:30"
+      "at": "2026-10-31T17:27:31+05:30"
     },
     {
       "seq": 2,
@@ -430,7 +645,7 @@
       "type": "stage_finished",
       "summary": "account_takeover, score 70",
       "evidence_ids": [],
-      "at": "2026-10-31T14:56:22+05:30"
+      "at": "2026-10-31T17:27:31+05:30"
     },
     {
       "seq": 3,
@@ -438,57 +653,58 @@
       "type": "stage_started",
       "summary": "Gathering Evidence",
       "evidence_ids": [],
-      "at": "2026-10-31T14:56:22+05:30"
+      "at": "2026-10-31T17:27:31+05:30"
     },
     {
       "seq": 4,
       "stage": "evidence",
       "type": "tool_call",
-      "summary": "get_account(ACC-20017)",
+      "summary": "get_transactions(ACC-20017)",
       "evidence_ids": [],
-      "at": "2026-10-31T14:56:24+05:30"
+      "at": "2026-10-31T17:27:32+05:30"
     },
     {
       "seq": 5,
       "stage": "evidence",
       "type": "tool_call",
-      "summary": "get_transactions(ACC-20017)",
+      "summary": "get_account_events(ACC-20017)",
       "evidence_ids": [],
-      "at": "2026-10-31T14:56:24+05:30"
+      "at": "2026-10-31T17:27:32+05:30"
     },
     {
       "seq": 6,
       "stage": "evidence",
-      "type": "tool_result",
-      "summary": "1 record(s) returned",
-      "evidence_ids": [
-        "EV-2"
-      ],
-      "at": "2026-10-31T14:56:24+05:30"
+      "type": "tool_call",
+      "summary": "get_device(DEV-9002)",
+      "evidence_ids": [],
+      "at": "2026-10-31T17:27:32+05:30"
     },
     {
       "seq": 7,
       "stage": "evidence",
       "type": "tool_call",
-      "summary": "get_account_events(ACC-20017)",
+      "summary": "get_account(ACC-20017)",
       "evidence_ids": [],
-      "at": "2026-10-31T14:56:24+05:30"
+      "at": "2026-10-31T17:27:32+05:30"
     },
     {
       "seq": 8,
       "stage": "evidence",
       "type": "tool_call",
-      "summary": "get_device(DEV-9002)",
+      "summary": "get_beneficiary(BEN-7002)",
       "evidence_ids": [],
-      "at": "2026-10-31T14:56:24+05:30"
+      "at": "2026-10-31T17:27:32+05:30"
     },
     {
       "seq": 9,
       "stage": "evidence",
-      "type": "tool_call",
-      "summary": "get_beneficiary(BEN-7002)",
-      "evidence_ids": [],
-      "at": "2026-10-31T14:56:24+05:30"
+      "type": "tool_result",
+      "summary": "2 record(s) returned",
+      "evidence_ids": [
+        "EV-2",
+        "EV-3"
+      ],
+      "at": "2026-10-31T17:27:32+05:30"
     },
     {
       "seq": 10,
@@ -496,7 +712,6 @@
       "type": "tool_result",
       "summary": "10 record(s) returned",
       "evidence_ids": [
-        "EV-3",
         "EV-4",
         "EV-5",
         "EV-6",
@@ -505,17 +720,20 @@
         "EV-9",
         "EV-10",
         "EV-11",
-        "EV-12"
+        "EV-12",
+        "EV-13"
       ],
-      "at": "2026-10-31T14:56:24+05:30"
+      "at": "2026-10-31T17:27:32+05:30"
     },
     {
       "seq": 11,
       "stage": "evidence",
-      "type": "tool_call",
-      "summary": "analyze_relationships(BEN-7002)",
-      "evidence_ids": [],
-      "at": "2026-10-31T14:56:24+05:30"
+      "type": "tool_result",
+      "summary": "1 record(s) returned",
+      "evidence_ids": [
+        "EV-14"
+      ],
+      "at": "2026-10-31T17:27:32+05:30"
     },
     {
       "seq": 12,
@@ -523,9 +741,9 @@
       "type": "tool_result",
       "summary": "1 record(s) returned",
       "evidence_ids": [
-        "EV-13"
+        "EV-15"
       ],
-      "at": "2026-10-31T14:56:24+05:30"
+      "at": "2026-10-31T17:27:32+05:30"
     },
     {
       "seq": 13,
@@ -533,20 +751,17 @@
       "type": "tool_result",
       "summary": "1 record(s) returned",
       "evidence_ids": [
-        "EV-14"
+        "EV-16"
       ],
-      "at": "2026-10-31T14:56:24+05:30"
+      "at": "2026-10-31T17:27:32+05:30"
     },
     {
       "seq": 14,
       "stage": "evidence",
-      "type": "tool_result",
-      "summary": "2 record(s) returned",
-      "evidence_ids": [
-        "EV-15",
-        "EV-16"
-      ],
-      "at": "2026-10-31T14:56:24+05:30"
+      "type": "tool_call",
+      "summary": "analyze_relationships(BEN-7002)",
+      "evidence_ids": [],
+      "at": "2026-10-31T17:27:33+05:30"
     },
     {
       "seq": 15,
@@ -556,7 +771,7 @@
       "evidence_ids": [
         "EV-17"
       ],
-      "at": "2026-10-31T14:56:24+05:30"
+      "at": "2026-10-31T17:27:33+05:30"
     },
     {
       "seq": 16,
@@ -564,39 +779,55 @@
       "type": "stage_finished",
       "summary": "17 Evidence records gathered",
       "evidence_ids": [],
-      "at": "2026-10-31T14:56:32+05:30"
+      "at": "2026-10-31T17:27:38+05:30"
     },
     {
       "seq": 17,
+      "stage": "typology",
+      "type": "stage_started",
+      "summary": "Checking Typologies",
+      "evidence_ids": [],
+      "at": "2026-10-31T17:27:38+05:30"
+    },
+    {
+      "seq": 18,
+      "stage": "typology",
+      "type": "stage_finished",
+      "summary": "Verified device change, Established payee",
+      "evidence_ids": [],
+      "at": "2026-10-31T17:27:39+05:30"
+    },
+    {
+      "seq": 19,
       "stage": "synthesis",
       "type": "stage_started",
       "summary": "Drafting the report",
       "evidence_ids": [],
-      "at": "2026-10-31T14:56:32+05:30"
+      "at": "2026-10-31T17:27:39+05:30"
     },
     {
-      "seq": 18,
+      "seq": 20,
       "stage": "synthesis",
       "type": "stage_finished",
       "summary": "Draft ready",
       "evidence_ids": [],
-      "at": "2026-10-31T14:56:39+05:30"
+      "at": "2026-10-31T17:27:50+05:30"
     },
     {
-      "seq": 19,
+      "seq": 21,
       "stage": "verification",
       "type": "verification",
       "summary": "All claims match their Evidence",
       "evidence_ids": [],
-      "at": "2026-10-31T14:56:39+05:30"
+      "at": "2026-10-31T17:27:50+05:30"
     },
     {
-      "seq": 20,
+      "seq": 22,
       "stage": "report",
       "type": "stage_finished",
       "summary": "Report saved",
       "evidence_ids": [],
-      "at": "2026-10-31T14:56:39+05:30"
+      "at": "2026-10-31T17:27:50+05:30"
     }
   ]
 }

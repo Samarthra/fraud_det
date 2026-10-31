@@ -66,7 +66,7 @@ def scan(data: dict[str, list[dict[str, Any]]], config: dict[str, Any]) -> list[
     for login in data["logins"]:
         logins_by_account[login["account_id"]].append(login)
     takeovers = _login_patterns(logins_by_account, config)
-    first_seen = _device_first_seen(data)
+    first_seen = device_first_seen(data)
     candidates = _transactions(data, accounts, first_seen, takeovers, config)
     candidates += _standalone_logins(accounts, first_seen, takeovers, config)
     candidates += _shared_devices(data, accounts, config)
@@ -76,7 +76,7 @@ def scan(data: dict[str, list[dict[str, Any]]], config: dict[str, Any]) -> list[
     return [c for c in candidates if c.score >= minimum]
 
 
-def _device_first_seen(data) -> dict[tuple[str, str], datetime]:
+def device_first_seen(data) -> dict[tuple[str, str], datetime]:
     seen: dict[tuple[str, str], datetime] = {}
     for row in [*data["logins"], *data["transactions"]]:
         if row.get("device_id"):

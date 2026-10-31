@@ -25,6 +25,7 @@ from contracts import (
     Report,
     Stats,
     Step,
+    TypologyResult,
 )
 from correlation.priority import assess
 from detection.engine import load_config
@@ -58,7 +59,7 @@ CREATE TABLE IF NOT EXISTS loan_applications (application_id TEXT PRIMARY KEY, c
   device_id TEXT, amount REAL, status TEXT, timestamp TEXT, ip TEXT, phone TEXT,
   disbursed_account_id TEXT, disbursed_at TEXT);
 CREATE TABLE IF NOT EXISTS account_events (account_id TEXT, type TEXT, at TEXT, details TEXT,
-  event_id TEXT);
+  event_id TEXT, target_id TEXT);
 CREATE TABLE IF NOT EXISTS policies (policy_id TEXT PRIMARY KEY, customer_id TEXT, product TEXT,
   sum_assured REAL, start_date TEXT, status TEXT);
 CREATE TABLE IF NOT EXISTS claims (claim_id TEXT PRIMARY KEY, policy_id TEXT, customer_id TEXT,
@@ -74,7 +75,8 @@ CREATE TABLE IF NOT EXISTS cases (id TEXT PRIMARY KEY, account_id TEXT, alert_id
   investigation_id TEXT, body TEXT);
 CREATE TABLE IF NOT EXISTS decisions (case_id TEXT, body TEXT);
 CREATE TABLE IF NOT EXISTS investigations (id TEXT PRIMARY KEY, case_id TEXT, status TEXT,
-  report TEXT, trace_url TEXT, is_replay INTEGER DEFAULT 0, replay_captured_at TEXT);
+  report TEXT, trace_url TEXT, is_replay INTEGER DEFAULT 0, replay_captured_at TEXT,
+  typology TEXT);
 CREATE TABLE IF NOT EXISTS evidence (id TEXT, investigation_id TEXT, kind TEXT, source_ref TEXT,
   body TEXT, PRIMARY KEY (investigation_id, kind, source_ref));
 CREATE TABLE IF NOT EXISTS steps (investigation_id TEXT, seq INTEGER, body TEXT);
@@ -91,7 +93,8 @@ DATA_TABLES = (
 ).split()
 ADDED_COLUMNS = {
     "loan_applications": "ip phone disbursed_account_id disbursed_at".split(),
-    "account_events": ["event_id"],
+    "account_events": ["event_id", "target_id"],
+    "investigations": ["typology"],
 }
 COLUMNS = {
     "customers": ("accounts", "account_id customer_id name phone email address onboarded_at portfolio"),
@@ -106,7 +109,7 @@ COLUMNS = {
         "application_id customer_id device_id amount status timestamp ip phone "
         "disbursed_account_id disbursed_at",
     ),
-    "account_events": ("account_events", "event_id account_id type at details"),
+    "account_events": ("account_events", "event_id account_id type at details target_id"),
     "policies": ("policies", "policy_id customer_id product sum_assured start_date status"),
     "claims": (
         "claims",
@@ -464,6 +467,68 @@ class Store:
 
     def get_transaction(self, transaction_id: str) -> dict[str, Any] | None:
         return self._one("SELECT * FROM transactions WHERE transaction_id=?", transaction_id)
+
+    def transactions_for(self, account_ids: Sequence[str]) -> list[dict[str, Any]]:
+        return self._rows_in("transactions", "account_id", account_ids)
+
+    def case_records(self, case_id: str, portfolio: str) -> dict[str, Any]:
+        """Everything a Typology check reads for one Case. Scope comes from the caller's code."""
+        alerts = self.case_alerts(case_id) or []
+        if not alerts:
+            row = self._one("SELECT body FROM cases WHERE id=?", case_id)
+            alerts = [Alert.model_validate_json(row["body"])] if row else []
+        return self.records_for_alerts(alerts, portfolio)
+
+    def records_for_alerts(self, alerts: list[Alert], portfolio: str) -> dict[str, Any]:
+        accounts = sorted({a.account_id for a in alerts if self.account_portfolio(a.account_id) == portfolio})
+        customers = sorted({a.customer_id for a in alerts})
+        transactions = self.transactions_for(accounts)
+        payers: dict[str, list] = {}
+        for beneficiary in {t["beneficiary_id"] for t in transactions}:
+            rows = self._all("SELECT timestamp, account_id FROM transactions WHERE beneficiary_id=?", beneficiary)
+            payers[beneficiary] = [(r["timestamp"], r["account_id"]) for r in rows]
+        claims = self.claims_for(customers)
+        claim_accounts = {}
+        for claim in claims:
+            rows = self.customer_accounts(claim["customer_id"], portfolio)
+            if rows:
+                claim_accounts[claim["claim_id"]] = rows[0]["account_id"]
+        mates: list[dict[str, Any]] = []
+        for key in ("device_id", "ip", "phone"):
+            for value in {c[key] for c in claims if c.get(key)}:
+                mates += self._all(f"SELECT * FROM claims WHERE {key}=?", value)
+        unique = list({c["claim_id"]: c for c in [*claims, *mates]}.values())
+        owners = {}
+        for claim in unique:
+            owner = self._one(
+                "SELECT * FROM accounts WHERE customer_id=? ORDER BY account_id", claim["customer_id"]
+            )
+            if owner:
+                owners[claim["customer_id"]] = owner
+        return {
+            "alerts": alerts,
+            "logins": self.logins_for(accounts),
+            "events": self.events_for(accounts),
+            "transactions": transactions,
+            "beneficiary_payers": payers,
+            "loans": self._rows_in("loan_applications", "disbursed_account_id", accounts),
+            "claims": [c for c in claims if c["claim_id"] in claim_accounts],
+            "claim_accounts": claim_accounts,
+            "claim_mates": unique,
+            "own_claims": {c["claim_id"] for c in unique if portfolio in self.customer_portfolios(c["customer_id"])},
+            "customer_rows": owners,
+        }
+
+    def record_for(self, kind: str, ref: str) -> dict[str, Any] | None:
+        """One source row, for saving a proof's cited records as Evidence."""
+        table, key = {
+            "transaction": ("transactions", "transaction_id"),
+            "login": ("logins", "login_id"),
+            "account_event": ("account_events", "event_id"),
+            "claim": ("claims", "claim_id"),
+            "loan_application": ("loan_applications", "application_id"),
+        }[kind]
+        return self._one(f"SELECT * FROM {table} WHERE {key}=?", ref)
 
     def account_rows(self) -> dict[str, dict[str, Any]]:
         return {r["account_id"]: r for r in self._all("SELECT * FROM accounts")}
@@ -868,6 +933,7 @@ class Store:
             trace_url=row["trace_url"],
             is_replay=bool(row["is_replay"]),
             replay_captured_at=row["replay_captured_at"],
+            typology=self.get_typology(investigation_id),
         )
 
     def append_step(
@@ -901,6 +967,9 @@ class Store:
             after,
         )
         return [Step.model_validate_json(r["body"]) for r in rows]
+
+    def verification_attempts(self, investigation_id: str) -> int:
+        return sum(s.type == "verification" for s in self.steps(investigation_id))
 
     def add_evidence(
         self,
@@ -957,6 +1026,17 @@ class Store:
             report.model_dump_json(),
             investigation_id,
         )
+
+    def save_typology(self, investigation_id: str, result: TypologyResult) -> None:
+        self._run(
+            "UPDATE investigations SET typology=? WHERE id=?",
+            result.model_dump_json(),
+            investigation_id,
+        )
+
+    def get_typology(self, investigation_id: str) -> TypologyResult | None:
+        row = self._one("SELECT typology FROM investigations WHERE id=?", investigation_id)
+        return TypologyResult.model_validate_json(row["typology"]) if row and row["typology"] else None
 
     def trace_url(self, investigation_id: str) -> str | None:
         row = self._one("SELECT trace_url FROM investigations WHERE id=?", investigation_id)

@@ -9,6 +9,7 @@ import HistoryTab from '../components/case/HistoryTab'
 import OverviewTab from '../components/case/OverviewTab'
 import ReportTab from '../components/case/ReportTab'
 import TimelineTab from '../components/case/TimelineTab'
+import TypologyStrip from '../components/case/TypologyStrip'
 import { useSteps } from '../components/case/useSteps'
 import { Badge, Button, ErrorNote, PriorityBadge, Risk, label, money, when } from '../ui'
 
@@ -147,6 +148,9 @@ export default function CasePage({ id }: { id: string }) {
         </div>
       </header>
       <ErrorNote message={error} />
+      {finished && investigation?.typology && (
+        <TypologyStrip result={investigation.typology} report={report} item={item} onShowEvidence={showEvidence} />
+      )}
 
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[23rem_1fr]">
         <ActivityPanel

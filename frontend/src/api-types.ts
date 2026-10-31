@@ -739,6 +739,7 @@ export interface components {
             /** Classifications */
             classifications: components["schemas"]["Classification"][];
             investigation: components["schemas"]["Investigation"] | null;
+            typology?: components["schemas"]["TypologyResult"] | null;
             /** History */
             history: components["schemas"]["HistoryEntry"][];
         };
@@ -818,7 +819,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "transaction" | "account" | "account_event" | "device" | "beneficiary" | "alert" | "relationship";
+            kind: "transaction" | "account" | "account_event" | "device" | "beneficiary" | "alert" | "relationship" | "typology" | "login" | "claim" | "loan_application" | "policy";
             /** Source Ref */
             source_ref: string;
             /** Data */
@@ -921,6 +922,7 @@ export interface components {
             is_replay: boolean;
             /** Replay Captured At */
             replay_captured_at?: string | null;
+            typology?: components["schemas"]["TypologyResult"] | null;
         };
         /** InvestigationStarted */
         InvestigationStarted: {
@@ -1055,7 +1057,7 @@ export interface components {
              * Stage
              * @enum {string}
              */
-            stage: "triage" | "evidence" | "synthesis" | "verification" | "report" | "follow_up";
+            stage: "triage" | "evidence" | "typology" | "synthesis" | "verification" | "report" | "follow_up";
             /**
              * Type
              * @enum {string}
@@ -1097,6 +1099,61 @@ export interface components {
             source_ref: string;
             /** Summary */
             summary: string;
+        };
+        /** TypologyNear */
+        TypologyNear: {
+            /** Typology */
+            typology: string;
+            /** Name */
+            name: string;
+            /** Account */
+            account: string;
+            /** Missing */
+            missing: string;
+        };
+        /** TypologyProof */
+        TypologyProof: {
+            /** Typology */
+            typology: string;
+            /** Name */
+            name: string;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "fraud" | "legitimate";
+            /** Account */
+            account: string;
+            /** Subject */
+            subject: string;
+            /** Steps */
+            steps: components["schemas"]["TypologyStep"][];
+            /** Evidence Id */
+            evidence_id?: string | null;
+        };
+        /** TypologyResult */
+        TypologyResult: {
+            /**
+             * Requirement
+             * @enum {string}
+             */
+            requirement: "suspicious" | "not_suspicious" | "none";
+            /** Proofs */
+            proofs: components["schemas"]["TypologyProof"][];
+            /**
+             * Near
+             * @default []
+             */
+            near: components["schemas"]["TypologyNear"][];
+        };
+        /** TypologyStep */
+        TypologyStep: {
+            /** Text */
+            text: string;
+            /** Record */
+            record?: string | null;
+            /** Quote */
+            quote?: string | null;
         };
         /** UploadResult */
         UploadResult: {

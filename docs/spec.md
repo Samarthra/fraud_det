@@ -8,7 +8,7 @@ This spec replaces the Hackathon Overview, the Architecture and Flows doc, and t
 
 **Priority order:** Level 1 of the organiser's brief, then a working Investigation with verifiable Evidence, then governance and evals.
 
-**Target:** Levels 1 and 2 of the brief plus a working Investigation. Section 12 maps Level 2 to the build. Any later level needs a fresh check against this spec.
+**Target:** Levels 1 and 2 of the brief plus a working Investigation. Section 12 maps Level 2 to the build, and section 13 specifies the Typology check, which is planned but not built. Any later level needs a fresh check against this spec.
 
 The organiser assesses actual application behaviour, so detection must work on uploaded data, not just seeded scenarios.
 
@@ -594,3 +594,128 @@ The score is a weighted sum from `rules.yaml`: severity 45%, exposure 30%, relat
 | 4 | Timeline. | "Loan, bank change, payout, transfer, claim, in one order." |
 | 5 | Change the risk classification, recommend a hold, download the report. | "The original stays on record, and a hold is only a recommendation." |
 | 6 | Takeover Case. | "Failed logins and the transfer are one account takeover. Anyone paying the same mule joins it." |
+
+## 13. Typology check
+
+**Status: planned, not built.** The reasoning behind each decision is on the [wayfinder map](https://github.com/Samarthra/fraud_det/issues/11).
+
+Verification proves that facts match, not that the reasoning is right. The Typology check closes that gap: code proves named patterns from a Case's records, and the Assessment must agree with the proof. Sarvam stays the only model, and nothing is trained.
+
+### Flow
+
+Triage, Evidence, **Typology**, Synthesis, Verification, Report.
+
+The Typology stage always runs and sits outside the agent loop, so `RECURSION_LIMIT` and the 6-step cap don't change. Code sets the Case and Portfolio, and the model passes no ID.
+
+### Typologies
+
+Rules live in YAML beside `rules.yaml`, including every window and threshold. They run on a small hand-written forward-chaining evaluator with strict validation at load. clingo joins the dev dependencies only, as a test oracle.
+
+| Typology | Direction | Proved when |
+|---|---|---|
+| Account takeover | Fraud | On one account within 2 hours: 3+ failed logins then a success, a SIM swap or a password reset; a device new to the account; and that device paying a first-time beneficiary |
+| Mule payment | Fraud | The account pays a first-time beneficiary that 5+ accounts paid within 7 days. Other Portfolios count as a bare number |
+| Loan proceeds diversion | Fraud | A payout into the account, then 50%+ of the loan to a first-time beneficiary within 72 hours |
+| Staged claim ring | Fraud | 2+ claims within 30 days from different customers outside one household who directly share a device, IP or phone |
+| Verified device change | Legitimate | `device_enrolled`, an `otp_verified` Text fact, and no failed login, SIM swap or password reset in the 24 hours before |
+| Established payee | Legitimate | `beneficiary_added` at least 24 hours before the first payment, and paid by this account only |
+
+- Each Typology is proved per account, and only from records in the 7 days before the Case's Alerts.
+- Code builds Hard facts from the Case's records in the store, within the Portfolio, not from what the agent fetched.
+- `new_device` uses detection's definition.
+- Multi-applicant loan rings, shared-device rings and credential stuffing with no payment have no Typology, so the agent decides them.
+
+### Facts
+
+`account_events` gains an optional `target_id`, in the upload format too, naming the device or beneficiary an event refers to. Hard facts never read an ID from `details`.
+
+There is one Text fact, `otp_verified`. It comes from one batched forced-tool call per Case, returning `{event_id, otp_verified, quote}` from fenced `<untrusted_data>`.
+
+- It reads only `device_enrolled` events in the window. An event with a blocker in the 24 hours before is never sent.
+- A fact is kept only if `event_id` was sent, `quote` appears word for word in `details`, and `otp_verified` is true. "OTP failed" must return false.
+- A Text fact can never cancel a Hard fact.
+- On any failure the fact is absent, with no retry. A step is logged and a limitation added.
+
+### Assessment
+
+| Proved | Verification requires |
+|---|---|
+| A fraud Typology on any account | `suspicious`. Fraud always beats legitimate |
+| At least one legitimate Typology, with every Alert covered | `not_suspicious` |
+| Anything else | Nothing, and the agent's Assessment stands |
+
+| Rule on an Alert | Coverage |
+|---|---|
+| `new_device` | Covered by Verified device change |
+| `new_beneficiary` | Covered by Established payee |
+| `amount_spike`, `off_hours` | Needs no cover |
+| Any other rule | Can't be covered |
+
+`verify()` adds an error when the draft goes against a requirement, or when a requirement exists and no finding cites the Typology Evidence. The error uses the one existing retry and names the Typology and its Evidence ID. A second failure saves the report as Unverified.
+
+`SYNTHESIS_SYSTEM` keeps its two rules for Cases with no requirement, and gains one line saying Typology Evidence decides when present.
+
+### Contract changes
+
+- `Stage` gains `typology`, and so does `STAGES` in `ActivityPanel`.
+- `EvidenceKind` gains `typology`, `login`, `claim`, `loan_application` and `policy`.
+- Each proof is `typology` Evidence with a `source_ref` such as `account_takeover/ACC-10042/BEN-7001`. Each cited record is its own Evidence.
+- A nearly proved Typology goes in the report's limitations, written by code.
+- `AgentStore` gains read helpers for the Case's Alerts and records, and `tests/fakes.py` matches.
+- `CaseReport` gains a `typology` block: the requirement, the Typologies proved and those nearly proved.
+
+### Safety fixes
+
+- `RECORD_ID` gains `CLM`, `POL`, `LOG` and `EVT`, so an invented ID can't pass Verification.
+- `quote`, and anything else copied from `details`, joins `UNTRUSTED_FIELDS`.
+
+### Case page
+
+- **Strip:** one line under the Case header on every tab, with the requirement, each proved Typology, any disagreement with the agent, and a count of nearly proved Typologies.
+- **Show proof:** opens a scoreboard of all six Typologies, marked Proved, Nearly or Not proved. Selecting one shows its steps and record IDs, or what's missing.
+- **Warning:** when a fraud Typology is proved on a Case an Analyst classified Low or Medium, the strip says so. The Analyst can overrule a proof, and Priority stays rule-based.
+
+### Evals
+
+The saved run predates Level 2, so it isn't the baseline.
+
+| Addition | Detail |
+|---|---|
+| Frozen held-out list | Fixed by ID before new stories exist. Nothing is tuned on it, and its stories aren't inspected |
+| Consolidated Cases | Evals call `consolidate` |
+| Fourth injection payload | A forged "passed OTP" in `details` on the takeover twin, 3 runs. `poisoned` supports `account_events`. The Case must stay `suspicious` |
+| Third scenario | Loan diversion, 10 runs, gate 9 of 10 |
+| Reader test | 12 paraphrased positives and 12 negatives, LLM against a phrase match |
+| No-LLM sweep | Runs on every eval, with held-out Alerts removed |
+
+The suite is about 61 runs, around ₹12 and 25 minutes. Cost is an estimate, so the eval counts model calls. The Evaluations screen shows before against after, retries fired, reports left Unverified by a mismatch, model calls per Investigation and the sweep.
+
+**Keep the check only if all of these hold, compared with the baseline:**
+
+- False positive reaches 8 of 10.
+- Takeover stays at 9 of 10 or better.
+- Injection stays at 100%.
+- Held-out correct is no lower.
+- Time and model calls per Investigation rise by no more than 25%.
+
+The LLM reader stays only if it scores 90% or better and beats the phrase match. Otherwise the phrase match becomes the build.
+
+### Build order
+
+Work happens on `typology-check`, branched from `main`, and reaches `main` only if the check passes.
+
+1. **Baseline:** freeze the held-out list, then run the paid eval on `main`.
+2. **Data:** add `target_id` and the new stories, after every older story in the generator.
+3. **Rules:** build the evaluator and six Typologies, and pass the no-LLM sweep, with no model calls.
+4. **Text reader:** run the reader test and settle LLM or phrase match.
+5. **Agent and screen:** add the Typology stage, Verification checks, safety fixes, strip and scoreboard, then run a live Investigation.
+6. **Final test:** recapture both Replays, capture a third for the loan diversion, run the full eval and compare.
+
+- **Roles:** Claude Code builds. The owner approves spending and makes the keep-or-drop call after step 6.
+- **Budget:** ₹35 of Sarvam credit, covering both evals, the reader test and one rerun. Check the balance before step 1, and ask before going over.
+- **On failure:** one rework. If it fails again, the check is dropped and `main` stays as it is.
+
+### Out of scope
+
+Trained models, detection recall, `slow_bleed`, carrying out any action, and a second LLM provider. Jev is parked until API access exists, and only ever competes for the Text fact.
+

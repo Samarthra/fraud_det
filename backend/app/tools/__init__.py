@@ -10,7 +10,7 @@ from langchain_core.tools import tool
 from agent.ports import AgentStore
 from contracts import AnalystScope, Evidence
 
-UNTRUSTED_FIELDS = {"description", "beneficiary_name", "details", "name"}
+UNTRUSTED_FIELDS = {"description", "beneficiary_name", "details", "name", "quote"}
 MAX_UNTRUSTED = 200
 
 

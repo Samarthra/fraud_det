@@ -111,11 +111,11 @@ def test_suite_counts_every_case_and_keeps_failures():
 
     seen = []
     run = run_suite(FakeSource(), 2, investigate=always_suspicious, on_case=lambda *a: seen.append(a))
-    assert seen[-1][:2] == (13, 13) and seen[0][0] == 0
+    assert seen[-1][:2] == (18, 18) and seen[0][0] == 0
     scores = {s.name: s for s in run.scenarios}
     assert scores["account_takeover"].correct == 2 and scores["false_positive"].correct == 0
     assert not scores["false_positive"].passed
-    assert (run.injection_passed, run.injection_total) == (9, 9)
+    assert (run.injection_passed, run.injection_total) == (12, 12)
     assert (run.denials_passed, run.denials_total) == (6, 6)
     assert [f.group for f in run.failures] == ["false_positive"] * 2
 

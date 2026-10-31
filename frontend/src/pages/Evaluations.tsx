@@ -5,6 +5,57 @@ import { Badge, Button, Card, ErrorNote, Stat, label, when } from '../ui'
 const POLL_MS = 3000
 const percent = (value: number) => `${Math.round(value * 100)}%`
 
+function TypologyCard({ run }: { run: EvalRun }) {
+  const t = run.typology!
+  const base = t.baseline
+  const score = (name: string) => run.scenarios.find((s) => s.name === name)
+  const rows: [string, string | number | undefined, string | number][] = base
+    ? [
+        ['False positive correct', base.false_positive, `${score('false_positive')?.correct ?? 0} of ${score('false_positive')?.runs ?? 0}`],
+        ['Takeover correct', base.account_takeover, `${score('account_takeover')?.correct ?? 0} of ${score('account_takeover')?.runs ?? 0}`],
+        ['Held-out correct', `${base.held_out_correct} of ${base.held_out_total}`, `${run.held_out_correct} of ${run.held_out_total}`],
+        ['Injection passed', `${base.injection_passed} of ${base.injection_total}`, `${run.injection_passed} of ${run.injection_total}`],
+        ['Model calls per Investigation', base.calls_per_investigation, t.calls_per_investigation],
+        ['Seconds per Investigation', base.seconds_per_investigation, t.seconds_per_investigation],
+      ]
+    : []
+  return (
+    <Card title="Typology check" tooltip="Whether the check earned its place, compared with a run before it existed.">
+      {t.keep !== null && (
+        <div className="mb-3 flex items-center gap-2 text-sm">
+          <Badge tone={t.keep ? 'green' : 'red'}>{t.keep ? 'Meets the keep bar' : 'Below the keep bar'}</Badge>
+          {t.keep_reasons.map((r) => <span key={r} className="text-slate-600">{r}</span>)}
+        </div>
+      )}
+      {rows.length > 0 && (
+        <table className="mb-3 w-full text-left text-sm">
+          <thead className="text-slate-500"><tr><th className="py-1">Measure</th><th>Before</th><th>After</th></tr></thead>
+          <tbody>{rows.map(([name, before, after]) => <tr key={name} className="border-t border-slate-100"><td className="py-1">{name}</td><td className="tabular-nums">{before}</td><td className="tabular-nums">{after}</td></tr>)}</tbody>
+        </table>
+      )}
+      <ul className="space-y-1 text-sm">
+        <li>Retries fired: {t.retries}</li>
+        <li>Reports left Unverified by a mismatch: {t.unverified_by_mismatch}</li>
+        <li>Model calls: {t.model_calls}. Cost above is an estimate, not a measurement.</li>
+        {t.reader && <li>Text reader: LLM {t.reader.llm.correct} of {t.reader.llm.total}, phrase match {t.reader.phrase_match.correct} of {t.reader.phrase_match.total}</li>}
+      </ul>
+      <h3 className="mb-1 mt-3 text-xs font-semibold text-slate-500">No-LLM sweep, by story</h3>
+      <table className="w-full text-left text-sm">
+        <thead className="text-slate-500"><tr><th className="py-1">Story</th><th>Truth</th><th>Alerts</th><th>Requires suspicious</th><th>Requires not suspicious</th><th>No requirement</th></tr></thead>
+        <tbody>
+          {Object.entries(t.sweep.stories).map(([story, row]) => (
+            <tr key={story} className="border-t border-slate-100">
+              <td className="py-1">{label(story)}</td><td>{row.fraud ? 'Fraud' : 'Benign'}</td><td className="tabular-nums">{row.alerts}</td>
+              <td className="tabular-nums">{row.suspicious}</td><td className="tabular-nums">{row.not_suspicious}</td><td className="tabular-nums">{row.none}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-2 text-xs text-slate-500">{t.sweep.wrong.length} benign Alert(s) required suspicious. Each sits on an account with fraud proved in the same 7 days, so read them with that in mind.</p>
+    </Card>
+  )
+}
+
 export default function Evaluations() {
   const [run, setRun] = useState<EvalRun | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -50,7 +101,7 @@ export default function Evaluations() {
   }, [loadRun])
 
   async function start() {
-    if (!window.confirm('Run all evals? This makes live Sarvam calls, takes about 25 minutes, and costs about ₹10.')) return
+    if (!window.confirm('Run all evals? This makes live Sarvam calls, takes about 25 minutes, and costs about ₹12.')) return
     try {
       await api.runEvals()
       setWasRunning(true)
@@ -117,6 +168,7 @@ export default function Evaluations() {
               <li>Held-out Alerts: {run.held_out_correct} of {run.held_out_total} correct</li>
             </ul>
           </Card>
+          {run.typology && <TypologyCard run={run} />}
           <Card title="Security" tooltip="Prompt injection and out-of-scope denial results.">
             <ul className="space-y-1 text-sm">
               <li>Prompt injection: {run.injection_passed} of {run.injection_total} passed</li>

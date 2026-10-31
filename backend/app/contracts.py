@@ -40,8 +40,15 @@ EvidenceKind = Literal[
     "beneficiary",
     "alert",
     "relationship",
+    "typology",
+    "login",
+    "claim",
+    "loan_application",
+    "policy",
 ]
-Stage = Literal["triage", "evidence", "synthesis", "verification", "report", "follow_up"]
+Stage = Literal[
+    "triage", "evidence", "typology", "synthesis", "verification", "report", "follow_up"
+]
 StepType = Literal[
     "stage_started", "tool_call", "tool_result", "denied", "verification", "stage_finished"
 ]
@@ -211,6 +218,18 @@ class ReportDraft(BaseModel):
     recommended_actions: list[Action]
 
 
+class OtpFact(BaseModel):
+    """Filled in through a forced tool. Code keeps it only if the quote is really in the record."""
+
+    event_id: str
+    otp_verified: bool
+    quote: str
+
+
+class OtpDraft(BaseModel):
+    facts: list[OtpFact]
+
+
 class FollowUpDraft(BaseModel):
     """Filled in through a forced tool, using existing Evidence only."""
 
@@ -250,6 +269,35 @@ class FollowUpRequest(BaseModel):
     question: str
 
 
+class TypologyStep(BaseModel):
+    text: str
+    record: str | None = None
+    quote: str | None = None
+
+
+class TypologyProof(BaseModel):
+    typology: str
+    name: str
+    direction: Literal["fraud", "legitimate"]
+    account: str
+    subject: str
+    steps: list[TypologyStep]
+    evidence_id: str | None = None
+
+
+class TypologyNear(BaseModel):
+    typology: str
+    name: str
+    account: str
+    missing: str
+
+
+class TypologyResult(BaseModel):
+    requirement: Literal["suspicious", "not_suspicious", "none"]
+    proofs: list[TypologyProof]
+    near: list[TypologyNear] = []
+
+
 class Investigation(BaseModel):
     id: str
     case_id: str
@@ -260,6 +308,7 @@ class Investigation(BaseModel):
     trace_url: str | None = None
     is_replay: bool = False
     replay_captured_at: str | None = None
+    typology: TypologyResult | None = None
 
 
 class GraphNode(BaseModel):
@@ -328,6 +377,7 @@ class CaseReport(BaseModel):
     notes: list[Note]
     classifications: list[Classification]
     investigation: "Investigation | None"
+    typology: TypologyResult | None = None
     history: list[HistoryEntry]
 
 
@@ -395,6 +445,21 @@ class EvalCaseResult(BaseModel):
         return not self.failures
 
 
+class TypologyEval(BaseModel):
+    """Before against after, and whether the check earned its place."""
+
+    sweep: dict[str, Any]
+    retries: int
+    unverified_by_mismatch: int
+    model_calls: int
+    calls_per_investigation: float
+    seconds_per_investigation: float
+    reader: dict[str, Any] | None = None
+    baseline: dict[str, Any] | None = None
+    keep: bool | None = None  # null without a baseline to compare with
+    keep_reasons: list[str] = []
+
+
 class EvalRun(BaseModel):
     """`evals/results/latest.json`, served by GET /evals/latest."""
 
@@ -412,3 +477,4 @@ class EvalRun(BaseModel):
     held_out_correct: int
     held_out_total: int
     failures: list[EvalCaseResult]
+    typology: TypologyEval | None = None

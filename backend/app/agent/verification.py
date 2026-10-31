@@ -4,9 +4,9 @@ import re
 from collections.abc import Iterable
 from typing import Any
 
-from contracts import Evidence, ReportDraft
+from contracts import Evidence, ReportDraft, TypologyResult
 
-RECORD_ID = re.compile(r"\b(?:ACC|TXN|BEN|DEV|CUS|APP)-[A-Za-z0-9-]*\d")
+RECORD_ID = re.compile(r"\b(?:ACC|TXN|BEN|DEV|CUS|APP|CLM|POL|LOG|EVT)-[A-Za-z0-9-]*\d")
 DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}(?=\D|$)")
 # Small bare numbers such as "30-day" or "6 accounts" are not treated as amounts.
 AMOUNT = re.compile(
@@ -90,9 +90,27 @@ def complete_citations(draft: ReportDraft, evidence: list[Evidence]) -> ReportDr
     return draft.model_copy(update={"findings": findings})
 
 
-def verify(draft: ReportDraft, evidence: list[Evidence]) -> list[str]:
+def check_typology(draft: ReportDraft, result: TypologyResult | None) -> list[str]:
+    """Holds the Assessment to what code proved. No requirement means no disagreement."""
+    if result is None or result.requirement == "none":
+        return []
+    direction = "fraud" if result.requirement == "suspicious" else "legitimate"
+    proofs = [p for p in result.proofs if p.direction == direction]
+    named = ", ".join(f"{p.name} ({p.evidence_id})" for p in proofs)
+    errors = []
+    if draft.assessment != result.requirement:
+        errors.append(f"Typology: {named} requires the assessment {result.requirement}.")
+    cited = {i for f in draft.findings for i in f.evidence_ids}
+    if not cited & {p.evidence_id for p in proofs}:
+        errors.append(f"Typology: no finding cites the proof. Cite {named}.")
+    return errors
+
+
+def verify(
+    draft: ReportDraft, evidence: list[Evidence], typology: TypologyResult | None = None
+) -> list[str]:
     by_id = {e.id: e for e in evidence}
-    errors: list[str] = []
+    errors = check_typology(draft, typology)
     if draft.assessment == "suspicious" and "no_action" in draft.recommended_actions:
         errors.append("no_action cannot be recommended on a suspicious assessment.")
     if not draft.findings:
