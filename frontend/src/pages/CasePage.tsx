@@ -149,7 +149,7 @@ export default function CasePage({ id }: { id: string }) {
       </header>
       <ErrorNote message={error} />
       {finished && investigation?.typology && (
-        <TypologyStrip result={investigation.typology} report={report} item={item} onShowEvidence={showEvidence} />
+        <TypologyStrip result={investigation.typology} report={report} item={item} classified={(detail.classifications?.length ?? 0) > 0} onShowEvidence={showEvidence} />
       )}
 
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[23rem_1fr]">

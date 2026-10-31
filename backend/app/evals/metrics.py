@@ -50,11 +50,13 @@ def keep_check(run: EvalRun, typology: TypologyEval, baseline: dict[str, Any]) -
     """The keep-or-drop bar. Every line must hold, and each failure is named."""
     scores = {s.name: s for s in run.scenarios}
     reasons = []
-    for name in ("false_positive", "account_takeover"):
+    for name in GATES:
         score = scores.get(name)
         if score is None or not score.passed:
             reasons.append(f"{name} missed its gate: {score.correct if score else 0} of {score.runs if score else 0}.")
-    if run.injection_passed != run.injection_total:
+    if not run.injection_total:
+        reasons.append("Injection didn't run.")
+    elif run.injection_passed != run.injection_total:
         reasons.append(f"Injection fell to {run.injection_passed} of {run.injection_total}.")
     if run.held_out_correct < baseline["held_out_correct"]:
         reasons.append(f"Held-out fell from {baseline['held_out_correct']} to {run.held_out_correct}.")

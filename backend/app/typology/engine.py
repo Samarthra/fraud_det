@@ -1,12 +1,14 @@
 """A small forward-chaining evaluator. Proofs and missing facts come from how it runs.
 
-Rules run once, in file order, and may use only facts or the heads of earlier rules. That rules
-out recursion and negation through a cycle, so there is nothing to stratify.
+Rules run once, in file order, and may use only facts or the heads of earlier rules. A head can't
+gain a rule once something has read it, which rules out recursion and negation through a cycle, so
+there is nothing to stratify.
 """
 
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
+from string import Formatter
 from typing import Any, Iterator
 
 import yaml
@@ -80,6 +82,8 @@ def _entry(raw: dict, where: str, known: dict[str, int]) -> Entry:
         items = [_entry(i, where, known) for i in raw["absent"]]
         if not any(i.kind == "fact" for i in items):
             raise RuleError(f"{where}: absent needs a fact.")
+        if any(i.kind == "absent" for i in items):
+            raise RuleError(f"{where}: absent can't hold another absent.")
         return Entry("absent", [], items, raw.get("say"), raw.get("missing"))
     atom = raw[kind]
     if not isinstance(atom, list) or not atom or not all(isinstance(t, (str, int, float)) for t in atom):
@@ -92,12 +96,51 @@ def _entry(raw: dict, where: str, known: dict[str, int]) -> Entry:
     return Entry(kind, atom, [], raw.get("say"), raw.get("missing"))
 
 
+def _check_test(rule_id: str, entry: Entry, bound: set[str]) -> None:
+    terms = entry.atom[1:]
+    if any(isinstance(t, str) and not t.startswith("$") for t in terms):
+        raise RuleError(f"{rule_id}: {entry.atom[0]} takes values and numbers only.")
+    if _vars(terms) - bound:
+        raise RuleError(f"{rule_id}: {entry.atom[0]} uses a value not yet bound.")
+
+
+def _check_bindings(rule_id: str, when: list[Entry]) -> set[str]:
+    """Every value is bound before it's used. Returns those the body binds."""
+    bound: set[str] = set()
+    for n, entry in enumerate(when):
+        if entry.kind == "fact":
+            bound |= _vars(entry.atom)
+        elif entry.kind == "test":
+            _check_test(rule_id, entry, bound)
+        else:
+            inner = set(bound)
+            for item in entry.items:
+                if item.kind == "fact":
+                    inner |= _vars(item.atom)
+                else:
+                    _check_test(rule_id, item, inner)
+            later = {v for e in when[n + 1:] if e.kind == "fact" for v in _vars(e.atom)}
+            if (inner - bound) & later:
+                raise RuleError(f"{rule_id}: absent runs before a value it shares is bound.")
+    for entry in when:
+        if entry.say and {f"${f}" for _, f, _, _ in Formatter().parse(entry.say) if f} - bound:
+            raise RuleError(f"{rule_id}: a say line uses a value the body never binds.")
+    return bound
+
+
+def _reads(when: list[Entry]) -> set[str]:
+    return {e.atom[0] for e in when if e.kind == "fact"} | {
+        i.atom[0] for e in when if e.kind == "absent" for i in e.items if i.kind == "fact"
+    }
+
+
 def parse_rules(raw: Any) -> list[Rule]:
     if not isinstance(raw, list):
         raise RuleError("The rule file must be a list.")
     known = dict(FACT_ARITY)
     rules: list[Rule] = []
     seen: set[str] = set()
+    read: set[str] = set()
     for item in raw:
         if not isinstance(item, dict) or set(item) - RULE_KEYS or {"id", "head", "when"} - set(item):
             raise RuleError(f"Bad rule {item!r}.")
@@ -109,16 +152,24 @@ def parse_rules(raw: Any) -> list[Rule]:
             raise RuleError(f"{rule_id}: typology must be fraud or legitimate.")
         if item.get("typology") and not item.get("name"):
             raise RuleError(f"{rule_id}: a Typology needs a name.")
+        if not isinstance(item["when"], list):
+            raise RuleError(f"{rule_id}: when must be a list.")
         when = [_entry(e, rule_id, known) for e in item["when"]]
-        bound: set[str] = set()
-        for entry in when:
-            if entry.kind == "fact":
-                bound |= _vars(entry.atom)
-            elif entry.kind == "test" and _vars(entry.atom) - bound:
-                raise RuleError(f"{rule_id}: {entry.atom[0]} uses a value not yet bound.")
+        bound = _check_bindings(rule_id, when)
         head = item["head"]
+        if not isinstance(head, list) or not head or not isinstance(head[0], str):
+            raise RuleError(f"{rule_id}: bad head {head!r}.")
+        if head[0] in FACT_ARITY:
+            raise RuleError(f"{rule_id}: {head[0]} is an input fact, so a rule can't conclude it.")
+        read |= _reads(when)
+        if head[0] in read:
+            raise RuleError(f"{rule_id}: {head[0]} was already read, so this would be recursion or missed.")
+        if "_" in head:
+            raise RuleError(f"{rule_id}: a head can't hold _.")
         if _vars(head) - bound:
             raise RuleError(f"{rule_id}: head uses a value the body never binds.")
+        if item.get("typology") and "$t" not in bound:
+            raise RuleError(f"{rule_id}: a Typology must bind $t, the time it held.")
         if known.get(head[0], len(head) - 1) != len(head) - 1:
             raise RuleError(f"{rule_id}: {head[0]} has a different size elsewhere.")
         known[head[0]] = len(head) - 1
@@ -204,6 +255,11 @@ def evaluate(rules: list[Rule], facts: list[Fact], window: tuple[int, int]):
             index[rule.head[0]].append(fact)
             derived.append(fact)
     return derived, index
+
+
+def first_time(fact: Fact) -> int:
+    """When the conclusion first held: the earliest `$t` of any way it was reached."""
+    return min(premises[0][2]["$t"] for premises in [fact.premises, *fact.alternatives])
 
 
 def proof_steps(fact: Fact) -> tuple[list[dict], list[Source]]:

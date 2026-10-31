@@ -1126,6 +1126,8 @@ export interface components {
             account: string;
             /** Subject */
             subject: string;
+            /** At */
+            at?: number | null;
             /** Steps */
             steps: components["schemas"]["TypologyStep"][];
             /** Evidence Id */

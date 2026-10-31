@@ -1,6 +1,7 @@
 """The Typology check: rule loading, proofs, the requirement and how it reaches Verification."""
 
 import json
+from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -44,11 +45,19 @@ def seeded():
     return store
 
 
+def before(at):
+    return (datetime.fromisoformat(at) - timedelta(hours=2)).isoformat()
+
+
 def check(store, transaction, otp=None):
     alert = next(a for a in store.all_alerts() if a.transaction_id == transaction)
     case = store.get_case(alert.case_id)
     records = store.case_records(case.merged_into or case.id, "portfolio-1")
     return prove(records, phrase_read(events_to_read(records)) if otp is None else otp)[0], records
+
+
+FIRST = {"fact": ["first_payment", "$p"]}
+ONE = {"id": "a", "head": ["x", "$p"], "when": [FIRST]}
 
 
 def test_the_six_rules_load():
@@ -67,6 +76,22 @@ def test_the_six_rules_load():
     [{"id": "a", "head": ["a", "$p"], "when": [{"fact": ["later", "$p"]}]},
      {"id": "b", "head": ["later", "$p"], "when": [{"fact": ["first_payment", "$p"]}]}],
     [{"id": "a", "typology": "maybe", "head": ["a"], "when": []}],
+    [ONE, {"id": "b", "head": ["x", "$p"], "when": [{"fact": ["x", "$p"]}]}],  # recursion
+    [ONE, {"id": "b", "head": ["y", "$p"], "when": [{"fact": ["x", "$p"]}]},
+     {"id": "c", "head": ["x", "$p"], "when": [{"fact": ["y", "$p"]}]}],  # recursion through another rule
+    [ONE, {"id": "b", "head": ["y", "$p"], "when": [{"fact": ["x", "$p"]}]},
+     {"id": "c", "head": ["x", "$p"], "when": [{"fact": ["new_device", "$p", "_"]}]}],  # b would miss c
+    [{"id": "a", "head": ["first_payment", "$p"], "when": [{"fact": ["new_device", "$p", "_"]}]}],  # redefined input
+    [{"id": "a", "head": ["x", "$p"], "when": [FIRST, {"absent": [FIRST, {"test": ["at_least", "$n", 1]}]}]}],
+    [{"id": "a", "head": ["x", "$p"], "when": [FIRST, {"absent": [{"test": ["at_least", "$n", 1]}, {"fact": ["payer_count", "$p", "$n"]}]}]}],
+    [{"id": "a", "head": ["x", "$p"], "when": [{"absent": [FIRST]}, FIRST]}],  # a value bound too late
+    [{"id": "a", "head": ["x", "$p"], "when": [{**FIRST, "say": "{nope}"}]}],
+    [{"id": "a", "head": ["x", "_"], "when": [FIRST]}],
+    [{"id": "a", "head": ["x", "$p"], "when": [FIRST, {"test": ["at_least", "_", 1]}]}],
+    [{"id": "a", "head": "x", "when": [FIRST]}],
+    [{"id": "a", "head": ["x"], "when": "nope"}],
+    [{"id": "a", "typology": "fraud", "name": "A", "head": ["a", "$p"], "when": [FIRST]}],  # no $t
+    [{"id": "a", "head": ["x", "$p"], "when": [FIRST, {"absent": [FIRST, {"absent": [FIRST]}]}]}],
 ])
 def test_a_bad_rule_file_is_refused_at_load(raw):
     with pytest.raises(RuleError):
@@ -100,6 +125,29 @@ def test_without_the_text_fact_it_falls_to_no_requirement_not_suspicious(seeded)
 def test_a_typology_that_was_never_close_is_not_reported_as_nearly_proved(seeded):
     result, _ = check(seeded, "TXN-50001")
     assert not any(n.typology == "loan_proceeds_diversion" for n in result.near)
+
+
+def test_a_later_verified_enrolment_cannot_clear_an_earlier_alert(seeded):
+    alert = next(a for a in seeded.all_alerts() if a.transaction_id == "TXN-50002")
+    records = seeded.records_for_alerts([alert], "portfolio-1")
+    enrolled = next(e for e in records["events"] if e["type"] == "device_enrolled" and e.get("target_id") == alert.device_id)
+    earlier = alert.model_copy(update={"id": "ALT-EARLIER", "created_at": before(enrolled["at"])})
+    both = {**records, "alerts": [earlier, alert]}
+    assert prove(records, phrase_read(events_to_read(records)))[0].requirement == "not_suspicious"
+    assert prove(both, phrase_read(events_to_read(both)))[0].requirement == "none"
+
+
+def test_an_accounts_very_first_payment_is_to_a_first_time_beneficiary(seeded):
+    alert = next(a for a in seeded.all_alerts() if a.transaction_id == "TXN-50001")
+    at = alert.created_at
+    records = {
+        "alerts": [alert.model_copy(update={"account_id": "ACC-NEW"})], "logins": [], "events": [], "loans": [],
+        "claims": [], "claim_accounts": {}, "claim_mates": [], "own_claims": set(), "customer_rows": {},
+        "transactions": [{"transaction_id": "TXN-NEW", "account_id": "ACC-NEW", "beneficiary_id": "BEN-NEW",
+                          "amount": 100.0, "device_id": "DEV-NEW", "timestamp": at}],
+        "beneficiary_payers": {"BEN-NEW": [(at, f"ACC-{n}") for n in range(5)]},
+    }
+    assert [p.typology for p in prove(records, [])[0].proofs] == ["mule_payment"]
 
 
 def test_loan_diversion_proves_across_systems(seeded):
@@ -139,14 +187,15 @@ def test_a_proof_never_cites_another_portfolio():
             assert not {s.record for p in result.proofs for s in p.steps} & outsiders
 
 
-def proof(typology, direction, account="A", subject="S", evidence_id="EV-1"):
+def proof(typology, direction, account="A", subject="S", evidence_id="EV-1", at=0):
     return TypologyProof(typology=typology, name=typology, direction=direction, account=account,
-                         subject=subject, steps=[], evidence_id=evidence_id)
+                         subject=subject, at=at, steps=[], evidence_id=evidence_id)
 
 
 def alert(rules, device="D"):
     return SimpleNamespace(
         account_id="A", device_id=device, transaction_id="T", application_id=None, claim_id=None,
+        created_at="2026-10-31T12:00:00+05:30",
         supporting_records=[SimpleNamespace(source_ref="T", kind="transaction", data={"beneficiary_id": "S"})],
         rule_hits=[SimpleNamespace(rule=r) for r in rules],
     )
@@ -163,6 +212,7 @@ def test_every_alert_must_be_covered_by_a_real_proof():
     assert requirement([alert(["new_device", "new_beneficiary"])], [device]) == "none"
     assert requirement([alert(["new_device", "foreign_ip"])], [device]) == "none"
     assert requirement([alert(["amount_spike"])], []) == "none"  # nothing proved, nothing to rely on
+    assert requirement([alert(["new_device"])], [proof("verified_device_change", "legitimate", subject="D", at=None)]) == "none"
 
 
 def draft(assessment, cites=("EV-1",)):

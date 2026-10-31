@@ -158,7 +158,7 @@ def build_graph(store: AgentStore, gather: Gather, synthesise: Synthesise, read:
                 investigation_id,
                 "typology",
                 f"{proof.typology}/{proof.account}/{proof.subject}",
-                {**proof.model_dump(exclude={"evidence_id"}),
+                {**proof.model_dump(exclude={"evidence_id", "at"}),
                  "derived_from": [s.record for s in proof.steps if s.record]},
             )
             proof.evidence_id = saved.id

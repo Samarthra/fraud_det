@@ -281,6 +281,7 @@ class TypologyProof(BaseModel):
     direction: Literal["fraud", "legitimate"]
     account: str
     subject: str
+    at: int | None = None  # epoch seconds when it first held. Decides which Alerts it can cover.
     steps: list[TypologyStep]
     evidence_id: str | None = None
 

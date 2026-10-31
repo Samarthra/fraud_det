@@ -84,18 +84,20 @@ export default function TypologyStrip({
   result,
   report,
   item,
+  classified,
   onShowEvidence,
 }: {
   result: Result
   report: Report | null
   item: Case
+  classified: boolean
   onShowEvidence: (id: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const names = [...new Map(result.proofs.map((p) => [p.typology, p])).values()]
   const mismatch = report?.verification === 'unverified' && report.verification_errors.some((e) => e.startsWith('Typology'))
   const proved = result.proofs.some((p) => p.direction === 'fraud')
-  const lowered = proved && item.risk_level !== 'high' && item.original_risk_level !== item.risk_level
+  const lowered = proved && classified && item.risk_level !== 'high'
 
   return (
     <section aria-label="Typology check" className="rounded-lg border border-slate-200 bg-white px-4 py-2">

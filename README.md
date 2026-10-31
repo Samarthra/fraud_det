@@ -79,14 +79,14 @@ uv run pytest
 
 Offline tests need no keys.
 
-The eval suite uses the real model, takes about 20 minutes and spends Sarvam credit:
+The eval suite uses the real model, takes about 25 minutes and spends about ₹12 of Sarvam credit:
 
 ```bash
 cd backend/app
 uv run python -m evals.run
 ```
 
-It writes `evals/results/latest.json`, which the Evaluations screen shows.
+It writes `evals/results/latest.json`, which the Evaluations screen shows, and compares the run with `evals/results/baseline.json`, the suite from before the Typology check. The saved `latest.json` predates that check, so run the suite to see its results.
 
 ## Find your way around
 

@@ -1,8 +1,8 @@
-from contracts import AnalystScope, EvalCaseResult, Finding, Report
+from contracts import AnalystScope, EvalCaseResult, EvalRun, Finding, Report, ScenarioScore, TypologyEval
 from evals.checks import check_case, check_injection
 from evals.denials import run_tool_denials
 from evals.fake_source import FakeSource
-from evals.metrics import detection_metrics, scenario_score
+from evals.metrics import GATES, detection_metrics, keep_check, scenario_score
 from evals.run import run_suite
 from fakes import TAKEOVER, FakeStore
 
@@ -48,6 +48,34 @@ def test_gates_at_their_boundaries():
     assert scenario_score("false_positive", fp(8)).passed
     assert not scenario_score("false_positive", fp(7)).passed
     assert not scenario_score("account_takeover", []).passed
+
+
+def keep_run(*missed, injection=9):
+    scores = [ScenarioScore(name=n, correct=gate - (n in missed), runs=10, gate=gate, passed=n not in missed)
+              for n, gate in GATES.items()]
+    return EvalRun(run_at="t", commit="c", model="m", estimated_cost_inr=1, notice="n",
+                   detection=detection_metrics([]), scenarios=scores, injection_passed=injection,
+                   injection_total=injection, denials_passed=6, denials_total=6, held_out_correct=15,
+                   held_out_total=19, failures=[])
+
+
+KEEP_SUMMARY = TypologyEval(sweep={}, retries=0, unverified_by_mismatch=0, model_calls=1,
+                            calls_per_investigation=4, seconds_per_investigation=30)
+BASELINE = {"held_out_correct": 15, "calls_per_investigation": 4, "seconds_per_investigation": 30}
+
+
+def test_the_keep_bar_needs_every_scenario_gate():
+    assert keep_check(keep_run(), KEEP_SUMMARY, BASELINE) == (True, [])
+    for name in GATES:
+        keep, reasons = keep_check(keep_run(name), KEEP_SUMMARY, BASELINE)
+        assert not keep and name in reasons[0]
+
+
+def test_the_keep_bar_refuses_a_run_with_a_scenario_or_injection_missing():
+    partial = keep_run()
+    partial.scenarios = [s for s in partial.scenarios if s.name != "loan_diversion"]
+    assert not keep_check(partial, KEEP_SUMMARY, BASELINE)[0]
+    assert not keep_check(keep_run(injection=0), KEEP_SUMMARY, BASELINE)[0]
 
 
 def test_an_unverified_report_fails_and_does_not_count_towards_the_gate():

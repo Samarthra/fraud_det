@@ -15,7 +15,7 @@ from contracts import (
 from correlation.consolidate import same_household, subject_record
 from detection.engine import device_first_seen, load_config
 
-from .engine import Fact, Rule, Source, evaluate, load_rules, nearest, proof_steps
+from .engine import Fact, Rule, Source, evaluate, first_time, load_rules, nearest, proof_steps
 
 NEEDS_NO_COVER = {"amount_spike", "off_hours"}
 OUTSIDE = "a claim outside your Portfolio"
@@ -89,7 +89,7 @@ def _payment_facts(records, new_device_hours: int, mule_days: int) -> list[Fact]
         ref, when, device = t["transaction_id"], seconds(t["timestamp"]), t.get("device_id")
         source = Source("transaction", ref)
         facts.append(Fact("payment", (ref, account_id, beneficiary, t["amount"], device, when), source))
-        if paid[account_id] and beneficiary not in paid[account_id]:
+        if beneficiary not in paid[account_id]:
             facts.append(Fact("first_payment", (ref,), source))
         paid[account_id].add(beneficiary)
         first = seen.get((account_id, device))
@@ -151,7 +151,11 @@ def _covered(alert: Alert, proofs: list[TypologyProof]) -> bool:
     for hit in alert.rule_hits:
         if hit.rule in NEEDS_NO_COVER:
             continue
-        if hit.rule == "new_device" and any(p.typology == "verified_device_change" and p.subject == alert.device_id for p in here):
+        if hit.rule == "new_device" and any(
+            p.typology == "verified_device_change" and p.subject == alert.device_id
+            and p.at is not None and p.at <= seconds(alert.created_at)  # verifying later clears nothing
+            for p in here
+        ):
             continue
         beneficiary = subject_record(alert).get("beneficiary_id")
         if hit.rule == "new_beneficiary" and any(p.typology == "established_payee" and p.subject == beneficiary for p in here):
@@ -182,7 +186,8 @@ def prove(records: dict[str, Any], otp: list[OtpFact], rules: list[Rule] | None 
         lines, sources = proof_steps(fact)
         steps = [TypologyStep(**s) for s in lines]
         proofs.append(TypologyProof(typology=rule.id, name=rule.name, direction=rule.typology,
-                                    account=fact.args[0], subject=str(fact.args[1]), steps=steps))
+                                    account=fact.args[0], subject=str(fact.args[1]),
+                                    at=first_time(fact), steps=steps))
         cited += sources
     proved = {(p.typology, p.account) for p in proofs}
     accounts = sorted({a.account_id for a in records["alerts"]})

@@ -8,7 +8,7 @@ This spec replaces the Hackathon Overview, the Architecture and Flows doc, and t
 
 **Priority order:** Level 1 of the organiser's brief, then a working Investigation with verifiable Evidence, then governance and evals.
 
-**Target:** Levels 1 and 2 of the brief plus a working Investigation. Section 12 maps Level 2 to the build, and section 13 specifies the Typology check, which is planned but not built. Any later level needs a fresh check against this spec.
+**Target:** Levels 1 and 2 of the brief plus a working Investigation. Section 12 maps Level 2 to the build, and section 13 specifies the Typology check, which is built, with its keep check still to run. Any later level needs a fresh check against this spec.
 
 The organiser assesses actual application behaviour, so detection must work on uploaded data, not just seeded scenarios.
 
@@ -597,7 +597,7 @@ The score is a weighted sum from `rules.yaml`: severity 45%, exposure 30%, relat
 
 ## 13. Typology check
 
-**Status: planned, not built.** The reasoning behind each decision is on the [wayfinder map](https://github.com/Samarthra/fraud_det/issues/11).
+**Status: built and merged, keep check not yet run.** The reasoning behind each decision is on the [wayfinder map](https://github.com/Samarthra/fraud_det/issues/11).
 
 Verification proves that facts match, not that the reasoning is right. The Typology check closes that gap: code proves named patterns from a Case's records, and the Assessment must agree with the proof. Sarvam stays the only model, and nothing is trained.
 
@@ -694,6 +694,7 @@ The suite is about 61 runs, around ₹12 and 25 minutes. Cost is an estimate, so
 
 - False positive reaches 8 of 10.
 - Takeover stays at 9 of 10 or better.
+- Loan diversion reaches 9 of 10.
 - Injection stays at 100%.
 - Held-out correct is no lower.
 - Time and model calls per Investigation rise by no more than 25%.
