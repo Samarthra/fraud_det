@@ -7,12 +7,13 @@ import DecisionDrawer from '../components/case/DecisionDrawer'
 import EvidenceTab from '../components/case/EvidenceTab'
 import HistoryTab from '../components/case/HistoryTab'
 import OverviewTab from '../components/case/OverviewTab'
+import { ProofPrototypeBar, VariantBoard, VariantStrip, VariantTrail, proofVariant } from '../components/case/PROTOTYPE_ProofDisplay'
 import ReportTab from '../components/case/ReportTab'
 import TimelineTab from '../components/case/TimelineTab'
 import { useSteps } from '../components/case/useSteps'
 import { Badge, Button, ErrorNote, PriorityBadge, Risk, label, money, when } from '../ui'
 
-type Tab = 'overview' | 'timeline' | 'graph' | 'report' | 'evidence' | 'alerts' | 'history'
+type Tab = 'typology' | 'overview' | 'timeline' | 'graph' | 'report' | 'evidence' | 'alerts' | 'history'
 
 export default function CasePage({ id }: { id: string }) {
   const [detail, setDetail] = useState<CaseDetail | null>(null)
@@ -20,7 +21,7 @@ export default function CasePage({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null)
   const [denied, setDenied] = useState(false)
   const [tick, setTick] = useState(0)
-  const [tab, setTab] = useState<Tab>('overview')
+  const [tab, setTab] = useState<Tab>(proofVariant() === 'B' ? 'report' : proofVariant() === 'C' ? 'typology' : 'overview')
   const [openEvidence, setOpenEvidence] = useState<string | null>(null)
   const [drawer, setDrawer] = useState(false)
   const chosenTab = useRef(false)
@@ -113,6 +114,7 @@ export default function CasePage({ id }: { id: string }) {
   const alerts = detail.alerts?.length ? detail.alerts : [alert]
   const priority = item.priority
   const TABS: [Tab, string][] = [
+    ...(proofVariant() === 'C' ? [['typology', 'Typology check'] as [Tab, string]] : []),
     ['overview', 'Overview'],
     ['timeline', 'Timeline'],
     ['graph', 'Network'],
@@ -147,6 +149,8 @@ export default function CasePage({ id }: { id: string }) {
         </div>
       </header>
       <ErrorNote message={error} />
+      {proofVariant() === 'A' && <VariantStrip />}
+      <ProofPrototypeBar />
 
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[23rem_1fr]">
         <ActivityPanel
@@ -183,6 +187,8 @@ export default function CasePage({ id }: { id: string }) {
             ))}
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            {tab === 'typology' && <VariantBoard />}
+            {tab === 'report' && proofVariant() === 'B' && <VariantTrail />}
             {tab === 'overview' && <OverviewTab detail={detail} onReclassify={reclassify} onSeparate={separate} />}
             {tab === 'timeline' && <TimelineTab events={detail.timeline ?? []} />}
             {tab === 'report' && (
