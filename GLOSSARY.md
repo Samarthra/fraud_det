@@ -9,11 +9,11 @@ A signal raised by detection that activity on an account looks suspicious. An Al
 _Avoid_: Case, flag, incident
 
 **Investigation**:
-One agent run or conversation looking into an account, transaction, or pattern. It may start from an Alert or from an analyst's prompt, and always produces exactly one Case.
+One agent run or conversation looking into a Case. It is optional, and always attaches exactly one report to that Case.
 _Avoid_: Run, session, chat
 
 **Case**:
-The reviewable report and analyst decision produced by one Investigation. A Case exists even when nothing suspicious is found.
+The record opened for an actionable Alert, holding its evidence, status, Decision history and any Investigation report. The Alert it came from never changes.
 _Avoid_: Report, ticket, finding
 
 **Assessment**:
@@ -21,7 +21,7 @@ The agent's conclusion in a Case on whether the activity is suspicious. It infor
 _Avoid_: Verdict, finding
 
 **Decision**:
-The Analyst's recorded outcome on a Case. Recommended actions in a Case are not carried out by recording one.
+The Analyst's recorded outcome on a Case, which may change with its history kept. Recommended actions in a Case are not carried out by recording one.
 _Avoid_: Verdict, resolution
 
 **Follow-up**:
@@ -45,7 +45,7 @@ The deterministic check of a drafted Case against its Evidence and allowed actio
 _Avoid_: Validation, grounding, review
 
 **Unverified**:
-The status of a Case that still failed Verification after its retry. The Case is kept and shows the Analyst why it failed.
+The status of an Investigation report that still failed Verification after its retry. The report is kept and shows the Analyst why it failed.
 _Avoid_: Failed, invalid
 
 **Replay**:
