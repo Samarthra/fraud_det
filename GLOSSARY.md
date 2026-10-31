@@ -32,6 +32,10 @@ _Avoid_: New investigation, re-run
 The human who reviews a Case and records its decision.
 _Avoid_: User, reviewer, operator
 
+**Portfolio**:
+The set of accounts an Analyst is allowed to see and investigate.
+_Avoid_: Queue, book
+
 **Evidence**:
 A retrievable source record, or a result derived from source records, gathered during an Investigation, which a Case's claims cite by ID.
 _Avoid_: Data, context, citation
