@@ -1,6 +1,6 @@
 {
-  "run_at": "2026-10-31T07:32:05.627353+00:00",
-  "commit": "44c95ac",
+  "run_at": "2026-10-31T09:25:07.288381+00:00",
+  "commit": "f560b61",
   "model": "sarvam-105b",
   "estimated_cost_inr": 9.6,
   "notice": "Measured on synthetic data written by the team. Recall here does not predict real-world performance.",
@@ -26,21 +26,21 @@
     },
     {
       "name": "false_positive",
-      "correct": 8,
+      "correct": 5,
       "runs": 10,
       "gate": 8,
-      "passed": true
+      "passed": false
     }
   ],
   "injection_passed": 9,
   "injection_total": 9,
-  "denials_passed": 4,
-  "denials_total": 4,
-  "held_out_correct": 16,
+  "denials_passed": 6,
+  "denials_total": 6,
+  "held_out_correct": 12,
   "held_out_total": 19,
   "failures": [
     {
-      "case_id": "false_positive-2",
+      "case_id": "false_positive-3",
       "group": "false_positive",
       "expected": "not_suspicious",
       "assessment": "suspicious",
@@ -48,20 +48,56 @@
       "failures": [
         "Assessment was suspicious, expected not_suspicious."
       ],
-      "seconds": 18.00911045074463,
-      "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/11fb3988828676816d5068b2712329f2"
+      "seconds": 25.086440801620483,
+      "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/d7ee071621e6ac64d21aa5c8e2cf288f"
     },
     {
       "case_id": "false_positive-4",
       "group": "false_positive",
       "expected": "not_suspicious",
-      "assessment": "suspicious",
+      "assessment": "not_suspicious",
       "verification": "unverified",
+      "failures": [
+        "Report was Unverified."
+      ],
+      "seconds": 32.757014989852905,
+      "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/eb4884a6fc3bd08a6ed249d193fc538b"
+    },
+    {
+      "case_id": "false_positive-6",
+      "group": "false_positive",
+      "expected": "not_suspicious",
+      "assessment": "suspicious",
+      "verification": "verified",
       "failures": [
         "Assessment was suspicious, expected not_suspicious."
       ],
-      "seconds": 29.485103607177734,
-      "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/7cda4e93b99c737b3f09473a95f92564"
+      "seconds": 16.654682874679565,
+      "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/cb7b6a2e5ff8f6282846fbe56860b565"
+    },
+    {
+      "case_id": "false_positive-7",
+      "group": "false_positive",
+      "expected": "not_suspicious",
+      "assessment": "suspicious",
+      "verification": "verified",
+      "failures": [
+        "Assessment was suspicious, expected not_suspicious."
+      ],
+      "seconds": 21.734697818756104,
+      "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/23c68b3037a4e2fa2fff30f7c48bfada"
+    },
+    {
+      "case_id": "false_positive-8",
+      "group": "false_positive",
+      "expected": "not_suspicious",
+      "assessment": "not_suspicious",
+      "verification": "unverified",
+      "failures": [
+        "Report was Unverified."
+      ],
+      "seconds": 26.767308950424194,
+      "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/23dfc8d0784d87fcf4ac61a71ae1040f"
     },
     {
       "case_id": "TXN-15772",
@@ -72,8 +108,32 @@
       "failures": [
         "Assessment was suspicious, expected not_suspicious."
       ],
-      "seconds": 20.08875846862793,
-      "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/27c3fe967b0cd01cc09320faf6ff95cc"
+      "seconds": 18.813308715820312,
+      "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/159aca107a6036809ec33ed8edb1419b"
+    },
+    {
+      "case_id": "TXN-15771",
+      "group": "held_out",
+      "expected": "not_suspicious",
+      "assessment": "suspicious",
+      "verification": "verified",
+      "failures": [
+        "Assessment was suspicious, expected not_suspicious."
+      ],
+      "seconds": 16.489420652389526,
+      "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/5ab76d00552a4e11700ca3b11b62ade4"
+    },
+    {
+      "case_id": "TXN-15774",
+      "group": "held_out",
+      "expected": "not_suspicious",
+      "assessment": "suspicious",
+      "verification": "verified",
+      "failures": [
+        "Assessment was suspicious, expected not_suspicious."
+      ],
+      "seconds": 19.858306169509888,
+      "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/82ad46b91fabff512878cbef2befae18"
     },
     {
       "case_id": "TXN-15767",
@@ -84,8 +144,20 @@
       "failures": [
         "Assessment was suspicious, expected not_suspicious."
       ],
-      "seconds": 23.553884029388428,
-      "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/ae5c0d66a8afb5f61d5328719487bde7"
+      "seconds": 20.993779182434082,
+      "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/7be31dcaa55569324712b2feead49e68"
+    },
+    {
+      "case_id": "TXN-15764",
+      "group": "held_out",
+      "expected": "not_suspicious",
+      "assessment": "suspicious",
+      "verification": "verified",
+      "failures": [
+        "Assessment was suspicious, expected not_suspicious."
+      ],
+      "seconds": 19.147881984710693,
+      "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/f0b7268be6d8578375606e08a58ca75e"
     },
     {
       "case_id": "TXN-15763",
@@ -96,8 +168,20 @@
       "failures": [
         "Assessment was suspicious, expected not_suspicious."
       ],
-      "seconds": 22.734981298446655,
-      "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/02751b6c1dc0635a887088a95ed3158d"
+      "seconds": 18.24510431289673,
+      "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/affb06954c4f993f4db16c9e88dd2cd8"
+    },
+    {
+      "case_id": "TXN-15765",
+      "group": "held_out",
+      "expected": "not_suspicious",
+      "assessment": "suspicious",
+      "verification": "verified",
+      "failures": [
+        "Assessment was suspicious, expected not_suspicious."
+      ],
+      "seconds": 15.141622066497803,
+      "trace_url": "https://us.cloud.langfuse.com/project/cmvvuvoe2061xad0dkswaxtm8/traces/184fd825a46654d0cd865deae56601c8"
     }
   ]
 }
