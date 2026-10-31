@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
-export function Card({ title, children, action }: { title?: string; children: ReactNode; action?: ReactNode }) {
-  return (
+export function Card({ title, children, action, tooltip }: { title?: string; children: ReactNode; action?: ReactNode; tooltip?: string }) {
+  const card = (
     <section className="rounded-lg border border-slate-200 bg-white p-4">
       {(title || action) && (
         <div className="mb-3 flex items-center justify-between gap-3">
@@ -12,14 +13,28 @@ export function Card({ title, children, action }: { title?: string; children: Re
       {children}
     </section>
   )
+  if (!tooltip) return card
+  return (
+    <Tooltip>
+      <TooltipTrigger render={card} />
+      <TooltipContent>{tooltip}</TooltipContent>
+    </Tooltip>
+  )
 }
 
-export function Stat({ label, value }: { label: string; value: ReactNode }) {
-  return (
+export function Stat({ label, value, tooltip }: { label: string; value: ReactNode; tooltip?: string }) {
+  const card = (
     <div className="rounded-lg border border-slate-200 bg-white p-4">
       <div className="text-xs text-slate-500">{label}</div>
       <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
     </div>
+  )
+  if (!tooltip) return card
+  return (
+    <Tooltip>
+      <TooltipTrigger render={card} />
+      <TooltipContent>{tooltip}</TooltipContent>
+    </Tooltip>
   )
 }
 
