@@ -43,9 +43,19 @@ class DbSource:
         self.candidates = scan(self.store.detection_inputs(), self.config)
         persist(self.store, self.candidates, self.config)
         self.alerts = self.store.alerts("portfolio-1")
-        other = next(a for a in generate().customers if a["portfolio"] == "portfolio-2")
+        other = next(
+            a for a in generate().customers
+            if a["portfolio"] == "portfolio-2" and self._wholly_out_of_scope(a["device"])
+        )
         self.out_of_scope_account = other["account_id"]
         self.out_of_scope_device = other["device"]
+
+    def _wholly_out_of_scope(self, device_id: str) -> bool:
+        """One customer can hold accounts in both Portfolios, which shares their device."""
+        device = self.store.get_device(device_id)
+        return device is not None and all(
+            self.store.account_portfolio(a) != self.scope.portfolio for a in device["accounts"]
+        )
 
     @staticmethod
     def _fresh() -> Store:

@@ -161,8 +161,21 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", choices=["db", "fake"], default="db")
     parser.add_argument("--repeats", type=int, default=10)
+    parser.add_argument("--denials-only", action="store_true", help="re-measure denials, no LLM")
     args = parser.parse_args()
     load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+    if args.denials_only:
+        from .db_source import DbSource
+
+        source = DbSource()
+        total, failures = run_tool_denials(
+            source.denial_store(), source.scope, source.out_of_scope_account, source.out_of_scope_device
+        )
+        run = EvalRun.model_validate_json(RESULTS.read_text())
+        run.denials_passed, run.denials_total = total - len(failures), total
+        RESULTS.write_text(run.model_dump_json(indent=2))
+        print(f"denials {run.denials_passed} of {total}", failures)
+        return
     if args.source == "fake":
         from .fake_source import FakeSource
 
