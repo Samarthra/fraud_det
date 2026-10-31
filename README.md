@@ -48,7 +48,7 @@ npm run dev
 
 **4. Open http://localhost:5173**
 
-Go to **Upload** and press **Load sample data**.
+Sign in with `analyst-1` or `analyst-2`, password `password`. These are public demo accounts, and this login is not real security. Then go to **Upload** and press **Load sample data**.
 
 ## Try the demo path
 
@@ -57,7 +57,7 @@ Go to **Upload** and press **Load sample data**.
 3. In the **Transaction** filter, enter `TXN-50001`, select the Alert, and open its Case.
 4. Press **Investigate**, watch the steps, then click a cited Evidence ID in the report.
 5. Record a Decision, then see it on **Governance**.
-6. Use `TXN-50002` for the false-positive scenario, or switch to the other Analyst to see access denied.
+6. Use `TXN-50002` for the false-positive scenario, or log out and sign in as the other Analyst to see access denied.
 
 Press **Reset demo** to start again. To try different detection settings, edit `backend/app/detection/rules.yaml`, then press **Re-run detection** on the Dashboard. A re-run only adds Alerts.
 
