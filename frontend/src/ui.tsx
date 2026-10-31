@@ -3,7 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 
 export function Card({ title, children, action, tooltip }: { title?: string; children: ReactNode; action?: ReactNode; tooltip?: string }) {
   const card = (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
+    <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
       {(title || action) && (
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
@@ -24,7 +24,7 @@ export function Card({ title, children, action, tooltip }: { title?: string; chi
 
 export function Stat({ label, value, tooltip }: { label: string; value: ReactNode; tooltip?: string }) {
   const card = (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
+    <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
       <div className="text-xs text-slate-500">{label}</div>
       <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
     </div>
@@ -71,8 +71,8 @@ export function Button({
   primary?: boolean
 }) {
   const look = primary
-    ? 'bg-blue-700 text-white hover:bg-blue-800'
-    : 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-100'
+    ? 'bg-blue-700 text-white hover:bg-blue-800 dark:bg-blue-600'
+    : 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
   return (
     <button
       type="button"
@@ -102,4 +102,4 @@ export function when(value: string) {
     : date.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
-export const inputClass = 'rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm'
+export const inputClass = 'rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'

@@ -3,6 +3,7 @@ import { api, clearSession, currentAnalyst, currentPassword, type Analyst } from
 import { Button } from './ui'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { MoonIcon, SunIcon } from 'lucide-react'
 import CasePage from './pages/CasePage'
 import Cases from './pages/Cases'
 import Dashboard from './pages/Dashboard'
@@ -42,6 +43,7 @@ export default function App() {
   const [analysts, setAnalysts] = useState<Analyst[]>([])
   const [analyst, setAnalyst] = useState(currentAnalyst())
   const [authed, setAuthed] = useState(!!currentPassword())
+  const [theme, setTheme] = useState(() => localStorage.getItem('fraudlens-theme') ?? 'light')
   const [version, setVersion] = useState(0)
 
   useEffect(() => {
@@ -49,6 +51,10 @@ export default function App() {
   }, [])
 
   const refresh = () => setVersion((v) => v + 1)
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+    try { localStorage.setItem('fraudlens-theme', theme) } catch { /* ignore */ }
+  }, [theme])
   const page = section || 'dashboard'
 
   if (!authed) {
@@ -61,8 +67,8 @@ export default function App() {
 
   return (
     <TooltipProvider>
-    <div className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <a href="#/dashboard" className="font-semibold">FraudLens AI</a>
           <nav className="flex flex-wrap gap-1">
@@ -70,7 +76,7 @@ export default function App() {
               <a
                 key={key}
                 href={`#/${key}`}
-                className={`rounded-md px-3 py-1.5 text-sm ${page === key ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+                className={`rounded-md px-3 py-1.5 text-sm ${page === key ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
               >
                 {text}
               </a>
@@ -82,6 +88,9 @@ export default function App() {
               <AvatarFallback>{initials(analysts.find((a) => a.id === analyst)?.name ?? analyst)}</AvatarFallback>
             </Avatar>
             <span className="hidden sm:inline text-sm">{analysts.find((a) => a.id === analyst)?.name ?? analyst}</span>
+            <Button onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}>
+              {theme === 'dark' ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
+            </Button>
             <Button onClick={() => { clearSession(); setAuthed(false); refresh() }}>Log out</Button>
             <Button onClick={() => api.reset().then(refresh)}>Reset demo</Button>
           </div>
