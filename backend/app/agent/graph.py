@@ -10,13 +10,23 @@ from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 
-from contracts import Alert, AnalystScope, Evidence, Report, ReportDraft
+from contracts import (
+    Alert,
+    AnalystScope,
+    Evidence,
+    OtpFact,
+    Report,
+    ReportDraft,
+    TypologyResult,
+)
 from tools import build_tools, evidence_for_model
+from typology import reader as text_reader
+from typology.check import events_to_read, prove
 
 from . import llm as models
 from . import tracing
 from .ports import AgentStore
-from .prompts import EVIDENCE_SYSTEM, FOLLOW_UP_SYSTEM, SYNTHESIS_SYSTEM
+from .prompts import EVIDENCE_SYSTEM, FOLLOW_UP_SYSTEM, OTP_SYSTEM, SYNTHESIS_SYSTEM
 from .verification import check_statement, complete_citations, verify
 
 RECURSION_LIMIT = 14  # about 6 tool steps
@@ -33,12 +43,14 @@ class InvestigationState(TypedDict, total=False):
     draft: ReportDraft | None
     verification_errors: list[str]
     limitations: list[str]
+    typology: TypologyResult | None
     attempt: int  # 0 or 1
     report: Report
 
 
 Gather = Callable[[str, AnalystScope, str, RunnableConfig], list[str]]
 Synthesise = Callable[[list, RunnableConfig], dict[str, Any]]
+ReadText = Callable[[list[dict[str, Any]], RunnableConfig], tuple[list[OtpFact], list[str]]]
 
 
 def evidence_pack(evidence: list[Evidence]) -> str:
@@ -83,7 +95,23 @@ def synthesise_with_model() -> Synthesise:
     return lambda messages, config: chain.invoke(messages, config)
 
 
-def build_graph(store: AgentStore, gather: Gather, synthesise: Synthesise):
+def read_with_model() -> ReadText:
+    chain = models.otp_model(models.chat_model())
+
+    def read(events, config):
+        messages = [("system", OTP_SYSTEM), ("user", text_reader.message(events))]
+        try:
+            result = chain.invoke(messages, config)
+        except Exception as e:
+            return [], [f"The enrolment text couldn't be read ({type(e).__name__})."]
+        if result["parsed"] is None:
+            return [], ["The enrolment text couldn't be read (unusable output)."]
+        return text_reader.keep(result["parsed"], events)
+
+    return read
+
+
+def build_graph(store: AgentStore, gather: Gather, synthesise: Synthesise, read: ReadText):
     def step(state, stage, kind, summary):
         store.append_step(state["investigation_id"], stage, kind, summary)
 
@@ -113,19 +141,60 @@ def build_graph(store: AgentStore, gather: Gather, synthesise: Synthesise):
         step(state, "evidence", "stage_finished", f"{len(found)} Evidence records gathered")
         return {"evidence": {e.id: e for e in found}, "limitations": limits}
 
+    def typology(state: InvestigationState, config: RunnableConfig):
+        """Always runs, from the store, so a tool the agent skipped can't hide a proof."""
+        investigation_id = state["investigation_id"]
+        step(state, "typology", "stage_started", "Checking Typologies")
+        records = store.case_records(state["case_id"], state["scope"].portfolio)
+        events = events_to_read(records)
+        otp, problems = read(events, config) if events else ([], [])
+        result, cited = prove(records, otp)
+        for source in cited:
+            row = store.record_for(source.kind, source.ref)
+            if row:
+                store.add_evidence(investigation_id, source.kind, source.ref, row)
+        for proof in result.proofs:
+            saved = store.add_evidence(
+                investigation_id,
+                "typology",
+                f"{proof.typology}/{proof.account}/{proof.subject}",
+                {**proof.model_dump(exclude={"evidence_id"}),
+                 "derived_from": [s.record for s in proof.steps if s.record]},
+            )
+            proof.evidence_id = saved.id
+        store.save_typology(investigation_id, result)
+        near = [f"Nearly proved: {n.name} on {n.account}, {n.missing}." for n in result.near]
+        for problem in problems:
+            step(state, "typology", "tool_result", problem)
+        names = ", ".join(dict.fromkeys(p.name for p in result.proofs)) or "No Typology proved"
+        step(state, "typology", "stage_finished", names)
+        found = store.list_evidence(investigation_id)
+        return {
+            "typology": result,
+            "evidence": {e.id: e for e in found},
+            "limitations": [*state.get("limitations", []), *problems, *near],
+        }
+
     def synthesis(state: InvestigationState, config: RunnableConfig):
         step(state, "synthesis", "stage_started", "Drafting the report")
         pack = evidence_pack(list(state["evidence"].values()))
+        checked = state.get("typology")
+        required = (
+            f"\n\nRequired assessment: {checked.requirement}."
+            if checked and checked.requirement != "none"
+            else ""
+        )
         messages = [
             ("system", SYNTHESIS_SYSTEM),
-            ("user", f"{state['triage']}\n\nEvidence:\n{pack}"),
+            ("user", f"{state['triage']}{required}\n\nEvidence:\n{pack}"),
         ]
         if state.get("attempt"):
             previous = state["draft"].model_dump_json() if state.get("draft") else "unparseable"
             errors = "\n".join(state["verification_errors"])
             messages.append(
                 ("user", f"Your previous draft failed.\nDraft: {previous}\nErrors:\n{errors}\n"
-                 "Fix each one by citing the record that holds the value, or remove the value.")
+                 "Fix each one by citing the record that holds the value, or remove the value. "
+                 "A Typology error means use the required assessment and cite that proof.")
             )
         result = synthesise(messages, config)
         raw, draft = result["raw"], result["parsed"]
@@ -141,7 +210,7 @@ def build_graph(store: AgentStore, gather: Gather, synthesise: Synthesise):
         if draft:
             found = list(state["evidence"].values())
             draft = complete_citations(draft, found)
-            errors += verify(draft, found)
+            errors += verify(draft, found, state.get("typology"))
         summary = "All claims match their Evidence" if not errors else f"{len(errors)} problem(s) found"
         step(state, "verification", "verification", summary)
         store.audit(
@@ -176,6 +245,7 @@ def build_graph(store: AgentStore, gather: Gather, synthesise: Synthesise):
     for name, node in [
         ("triage", triage),
         ("evidence", evidence),
+        ("typology", typology),
         ("synthesis", synthesis),
         ("verification", verification),
         ("report", report),
@@ -183,7 +253,8 @@ def build_graph(store: AgentStore, gather: Gather, synthesise: Synthesise):
         graph.add_node(name, node)
     graph.add_edge(START, "triage")
     graph.add_edge("triage", "evidence")
-    graph.add_edge("evidence", "synthesis")
+    graph.add_edge("evidence", "typology")
+    graph.add_edge("typology", "synthesis")
     graph.add_edge("synthesis", "verification")
     graph.add_conditional_edges("verification", after_verification, ["synthesis", "report"])
     graph.add_edge("report", END)
@@ -196,6 +267,7 @@ def run_investigation(
     store: AgentStore,
     gather: Gather | None = None,
     synthesise: Synthesise | None = None,
+    read: ReadText | None = None,
 ) -> None:
     """Always ends with a saved report, so a failed run is still reviewable."""
     try:
@@ -205,7 +277,10 @@ def run_investigation(
         if url:  # set first, because the UI stops polling once the report is saved
             store.set_trace_url(investigation_id, url)
         graph = build_graph(
-            store, gather or gather_with_model(store), synthesise or synthesise_with_model()
+            store,
+            gather or gather_with_model(store),
+            synthesise or synthesise_with_model(),
+            read or (lambda events, config: read_with_model()(events, config)),
         )
         graph.invoke(
             {

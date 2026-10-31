@@ -93,6 +93,14 @@ class FakeStore:
         }
 
     def get_alert_for_investigation(self, investigation_id): return self.alert
+    def case_records(self, case_id, portfolio):
+        return {"alerts": [self.alert], "logins": [], "events": [], "transactions": [], "beneficiary_payers": {},
+                "loans": [], "claims": [], "claim_accounts": {}, "claim_mates": [], "own_claims": set(),
+                "customer_rows": {}}
+
+    def record_for(self, kind, ref): return {"ref": ref}
+    def save_typology(self, investigation_id, result): self.typology = result
+    def verification_attempts(self, investigation_id): return sum(s.type == "verification" for s in self.steps)
     def account_portfolio(self, account_id): return self.portfolios.get(account_id)
     def get_account(self, account_id): return self.accounts.get(account_id)
     def get_transactions(self, account_id, limit=10): return self.transactions.get(account_id, [])[:limit]

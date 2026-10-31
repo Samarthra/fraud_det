@@ -31,6 +31,7 @@ Nothing here is real bank data. It is all fake demo data.
 - `backend/app/store.py` - database helpers.
 - `backend/app/detection/engine.py` - finds suspicious patterns.
 - `backend/app/correlation/` - joins Alerts into Cases and ranks them.
+- `backend/app/typology/` - proves fraud patterns from the records, with no AI involved.
 - `backend/app/agent/` - AI investigation agent.
 - `backend/app/contracts.py` - shapes of data shared by frontend and backend.
 - `docs/spec.md` - full technical spec.
@@ -71,4 +72,5 @@ Each user sees only their own portfolio's data.
 - **Alert** = "this looks suspicious."
 - **Case** = one or more linked Alerts someone is working on.
 - **Evidence** = records used to explain an Alert.
+- **Typology** = a named pattern, like account takeover, that code can prove from the records.
 - **Decision** = final human choice (fraud / not fraud / escalate).

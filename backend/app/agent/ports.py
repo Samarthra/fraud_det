@@ -2,7 +2,7 @@
 
 from typing import Any, Protocol, Sequence
 
-from contracts import Alert, Evidence, FollowUp, Report, Stage, StepType
+from contracts import Alert, Evidence, FollowUp, Report, Stage, StepType, TypologyResult
 
 
 class AgentStore(Protocol):
@@ -20,6 +20,11 @@ class AgentStore(Protocol):
     def beneficiary_payments(self, beneficiary_id: str, days: int = 7) -> list[dict[str, Any]]:
         """One row per payment: `account_id`, `transaction_id`, `portfolio`."""
         ...
+
+    def case_records(self, case_id: str, portfolio: str) -> dict[str, Any]:
+        """Every record a Typology check reads for one Case, within the Portfolio."""
+        ...
+    def record_for(self, kind: str, ref: str) -> dict[str, Any] | None: ...
 
     # Investigation records
     def append_step(
@@ -45,6 +50,8 @@ class AgentStore(Protocol):
     def save_report(self, investigation_id: str, report: Report) -> None:
         """Also sets the Investigation to `complete`."""
         ...
+    def save_typology(self, investigation_id: str, result: TypologyResult) -> None: ...
+    def verification_attempts(self, investigation_id: str) -> int: ...
     def set_trace_url(self, investigation_id: str, url: str) -> None: ...
     def get_follow_up(self, follow_up_id: str) -> FollowUp: ...
     def list_follow_ups(self, investigation_id: str) -> list[FollowUp]: ...

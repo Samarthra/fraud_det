@@ -5,25 +5,35 @@ import json
 import subprocess
 import sys
 import time
+from collections import Counter
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from dotenv import load_dotenv
 
 from agent import tracing
 from agent.graph import run_investigation
 from agent.ports import AgentStore
-from contracts import AnalystScope, Assessment, DetectionMetrics, EvalCaseResult, EvalRun
+from contracts import (
+    AnalystScope,
+    Assessment,
+    DetectionMetrics,
+    EvalCaseResult,
+    EvalRun,
+    TypologyEval,
+)
 
 from .checks import check_case, check_injection
 from .denials import run_tool_denials
 from .injection import PAYLOADS
-from .metrics import GATES, scenario_score
+from .metrics import GATES, keep_check, scenario_score
 
 RESULTS = Path(__file__).parent / "results" / "latest.json"
 REHEARSAL = RESULTS.with_name("rehearsal.json")  # never served to the screen
+BASELINE = RESULTS.with_name("baseline.json")  # the suite on main, before the Typology check
+READER = RESULTS.with_name("reader.json")
 PROGRESS = RESULTS.with_name("progress.json")
 COST_PER_RUN_INR = 0.20
 NOTICE = (
@@ -41,6 +51,7 @@ class Source(Protocol):
     def scenario(self, name: str) -> AgentStore: ...
     def poisoned(self, field: str, text: str) -> AgentStore: ...
     def held_out(self) -> list[tuple[str, AgentStore, Assessment]]: ...
+    def sweep(self) -> dict[str, Any]: ...
     def denial_store(self) -> AgentStore: ...
     def detection(self) -> DetectionMetrics | None: ...
 
@@ -66,7 +77,9 @@ def run_case(
     scope: AnalystScope,
     injection: bool = False,
     investigate: Investigate = run_investigation,
+    counts: Counter | None = None,
 ) -> EvalCaseResult:
+    counts = Counter() if counts is None else counts
     investigation_id = f"eval-{run_id}-{case_id}"
     started = time.time()
     investigate(investigation_id, scope, store)
@@ -79,6 +92,12 @@ def run_case(
     )
     tracing.score(investigation_id, not failures, group)
     print(f"{case_id}: {'pass' if not failures else failures} ({seconds:.0f}s)", flush=True)
+    counts["retries"] += store.verification_attempts(investigation_id) > 1
+    errors = report.verification_errors if report else []
+    counts["mismatches"] += report is not None and report.verification == "unverified" and any(
+        e.startswith("Typology") for e in errors)
+    counts["seconds"] += seconds
+    counts["runs"] += 1
     return EvalCaseResult(
         case_id=case_id,
         group=group,
@@ -102,11 +121,13 @@ def run_suite(
     cases_to_hold = source.held_out()
     total = repeats * len(GATES) + len(cases_to_hold) + 3 * len(PAYLOADS)
     finished = 0
+    counts: Counter = Counter()
+    calls_before = tracing.counter.calls
 
     def tracked(case_id: str, *args, **kwargs) -> EvalCaseResult:
         nonlocal finished
         on_case(finished, total, case_id)
-        result = run_case(run_id, case_id, *args, investigate=investigate, **kwargs)
+        result = run_case(run_id, case_id, *args, investigate=investigate, counts=counts, **kwargs)
         finished += 1
         on_case(finished, total, case_id)
         return result
@@ -114,6 +135,7 @@ def run_suite(
     expected: dict[str, Assessment] = {
         "account_takeover": "suspicious",
         "false_positive": "not_suspicious",
+        "loan_diversion": "suspicious",
     }
     scenarios = {
         name: [
@@ -141,7 +163,7 @@ def run_suite(
 
     cases = [r for group in scenarios.values() for r in group] + held_out + injection
     tracing.flush()
-    return EvalRun(
+    run = EvalRun(
         run_at=datetime.now(timezone.utc).isoformat(),
         commit=subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True
@@ -159,6 +181,21 @@ def run_suite(
         held_out_total=len(held_out),
         failures=[r for r in cases if not r.passed],
     )
+    calls = tracing.counter.calls - calls_before
+    summary = TypologyEval(
+        sweep=source.sweep(),
+        retries=counts["retries"],
+        unverified_by_mismatch=counts["mismatches"],
+        model_calls=calls,
+        calls_per_investigation=round(calls / max(1, counts["runs"]), 2),
+        seconds_per_investigation=round(counts["seconds"] / max(1, counts["runs"]), 1),
+        reader=json.loads(READER.read_text()) if READER.exists() else None,
+    )
+    if BASELINE.exists():
+        summary.baseline = json.loads(BASELINE.read_text())
+        summary.keep, summary.keep_reasons = keep_check(run, summary, summary.baseline)
+    run.typology = summary
+    return run
 
 
 def main() -> None:

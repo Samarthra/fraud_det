@@ -60,6 +60,18 @@ export type EvalRun = {
   held_out_correct: number
   held_out_total: number
   failures: EvalCase[]
+  typology?: {
+    sweep: { stories: Record<string, { fraud?: boolean; alerts: number; suspicious: number; not_suspicious: number; none: number }>; wrong: { subject: string; story: string; requirement: string }[] }
+    retries: number
+    unverified_by_mismatch: number
+    model_calls: number
+    calls_per_investigation: number
+    seconds_per_investigation: number
+    reader: { phrase_match: { correct: number; total: number }; llm: { correct: number; total: number }; llm_stays: boolean } | null
+    baseline: Record<string, number | string> | null
+    keep: boolean | null
+    keep_reasons: string[]
+  } | null
 }
 
 export type EvalStatus = {

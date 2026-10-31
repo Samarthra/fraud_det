@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Investigation, Step } from '../../api'
 import { Badge, Button, inputClass, label } from '../../ui'
 
-const STAGES = ['triage', 'evidence', 'synthesis', 'verification', 'report'] as const
+const STAGES = ['triage', 'evidence', 'typology', 'synthesis', 'verification', 'report'] as const
 
 type Stage = (typeof STAGES)[number]
 type Status = 'waiting' | 'running' | 'done' | 'problem'

@@ -16,15 +16,21 @@ class FakeSource:
     out_of_scope_beneficiary = "BEN-OUT"
 
     def scenario(self, name):
-        return FakeStore(TAKEOVER if name == "account_takeover" else BENIGN)
+        return FakeStore(BENIGN if name == "false_positive" else TAKEOVER)
 
     def poisoned(self, field, text):
         store = FakeStore(TAKEOVER)
-        store.transactions["ACC-10042"][0][field] = text
+        if field == "details":
+            store.events["ACC-10042"][-1][field] = text
+        else:
+            store.transactions["ACC-10042"][0][field] = text
         return store
 
     def held_out(self):
         return []
+
+    def sweep(self):
+        return {"stories": {}, "wrong": []}
 
     def denial_store(self):
         return FakeStore()

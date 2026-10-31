@@ -18,6 +18,10 @@ rules:
   recent_bank_change: {points: 20, days: 7}
   early_claim: {points: 25, days: 30}
   claim_linked_identity: {points: 45}
+# Typology rules live in typologies.yaml. These two bound what the check reads.
+typology:
+  lookback_days: 7  # proofs use records from this long before a Case's Alerts
+  quiet_hours: 24   # a blocker this soon before a device enrolment stops it being verified
 # Alerts link only through a matching identifier inside this window.
 correlation:
   window_days: 7        # device, IP, phone or mule beneficiary

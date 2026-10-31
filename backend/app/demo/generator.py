@@ -117,10 +117,10 @@ class Builder:
         })
         self.label(claim_id, fraud, story)
 
-    def event(self, account_id, kind, at, details):
+    def event(self, account_id, kind, at, details, target=None):
         self.s.account_events.append({
             "event_id": f"EVT-{len(self.s.account_events) + 1}", "account_id": account_id,
-            "type": kind, "at": at, "details": details,
+            "type": kind, "at": at, "details": details, "target_id": target,
         })
 
     def label(self, subject_id, is_fraud, story):
@@ -168,13 +168,13 @@ def benign_stories(b: Builder, accounts) -> None:
         device = f"DEV-{a['account_id'][-4:]}N"
         when = b.at(days)
         b.sign_in(a, device, when)
-        b.event(a["account_id"], "device_enrolled", when, f"{device} passed OTP to registered SIM, usual city {a['city']}")
+        b.event(a["account_id"], "device_enrolled", when, f"{device} passed OTP to registered SIM, usual city {a['city']}", device)
         b.pay(a, a["payees"][0][0], a["payees"][0][1], a["typical"] * 7, b.at(days, -60), device,
               description="Annual fee", story="new_phone_large_payment")
     for a in picks[14:26]:  # paying a new landlord
         days = r.uniform(1, 6)
         beneficiary = f"BEN-{5000 + r.randint(0, 900)}"
-        b.event(a["account_id"], "beneficiary_added", b.at(days + 2), f"{beneficiary} added")
+        b.event(a["account_id"], "beneficiary_added", b.at(days + 2), f"{beneficiary} added", beneficiary)
         b.pay(a, beneficiary, "New landlord", a["typical"] * 8, b.daytime(days), a["device"],
               description="Rent deposit", story="new_landlord")
     for a in picks[26:38]:  # a one-off large purchase
@@ -264,7 +264,7 @@ def scenarios(b: Builder) -> None:
     b.sign_in(takeover, "DEV-9001", b.at(0, 108))
     b.event("ACC-10042", "sim_swap", b.at(0, 112), "SIM replaced")
     b.event("ACC-10042", "password_reset", b.at(0, 110), "Reset by SMS")
-    b.event("ACC-10042", "device_enrolled", b.at(0, 106), "DEV-9001, foreign IP RO")
+    b.event("ACC-10042", "device_enrolled", b.at(0, 106), "DEV-9001, foreign IP RO", "DEV-9001")
     for i, (account_id, portfolio) in enumerate(
         [("ACC-10311", "portfolio-1"), ("ACC-10388", "portfolio-1"), ("ACC-10455", "portfolio-1"),
          ("ACC-60001", "portfolio-2"), ("ACC-60002", "portfolio-2"), ("ACC-60003", "portfolio-2")]
@@ -283,8 +283,8 @@ def scenarios(b: Builder) -> None:
               description="Rent")
     b.sign_in(benign, "DEV-2017", b.daytime(3))
     b.sign_in(benign, "DEV-9002", b.at(0, 180))
-    b.event("ACC-20017", "device_enrolled", b.at(0, 180), "DEV-9002 passed OTP to registered SIM, usual city Pune")
-    b.event("ACC-20017", "beneficiary_added", b.at(2), "BEN-7002 added")
+    b.event("ACC-20017", "device_enrolled", b.at(0, 180), "DEV-9002 passed OTP to registered SIM, usual city Pune", "DEV-9002")
+    b.event("ACC-20017", "beneficiary_added", b.at(2), "BEN-7002 added", "BEN-7002")
     b.pay(benign, "BEN-7002", "S Mehta", 62000.0, b.at(0, 60), "DEV-9002",
           description="Rent deposit, new flat", story="new_landlord", txn_id="TXN-50002")
 
@@ -344,13 +344,63 @@ def linked_scenario(b: Builder) -> None:
     b.apply(applicant["customer_id"], RING_DEVICE, 600000, b.at(3), "multi_applicant_ring", True,
             application_id="APP-9001", status="disbursed", ip=RING_IP, phone=applicant["phone"],
             disbursed_account_id="ACC-10077", disbursed_at=b.at(0, 600))
-    b.event("ACC-10077", "bank_account_changed", b.at(1), "Disbursement account changed to ACC-10077 on the mobile app")
+    b.event("ACC-10077", "bank_account_changed", b.at(1), "Disbursement account changed to ACC-10077 on the mobile app", "ACC-10077")
     b.pay(applicant, "BEN-7003", "Zenith Exim", 575000.0, b.at(0, 420), RING_DEVICE,
           description="Payment", story="loan_proceeds_diversion", fraud=True, txn_id="TXN-50003")
 
     policy = b.policy("CUS-10780", b.at(20), 800000, policy_id="POL-9001")
     b.claim(policy, "CUS-10780", 400000.0, b.at(2), "staged_claim_ring", True, device=RING_DEVICE,
             ip=RING_IP, phone=applicant["phone"], claim_id="CLM-9001")
+
+
+PARAPHRASED = [
+    "Customer entered the one-time code sent to their registered number",
+    "Enrolment confirmed with the code texted to the phone on file",
+    "One time passcode verified against the registered mobile",
+    "Device approved after the customer keyed in the SMS code",
+    "Code delivered to the registered SIM was entered correctly",
+    "Customer completed two-step check using their registered phone",
+    "OTP challenge cleared on the first attempt",
+    "Security code from the registered number matched",
+    "Authenticated by a verification code on the customer's own SIM",
+    "Passcode sent by text was confirmed by the customer",
+    "Registered mobile received the code and the customer entered it",
+    "Second factor passed using the SIM on record",
+]
+NEGATED = [
+    "OTP failed three times, enrolled by fallback",
+    "OTP not completed, enrolment went through the call centre",
+    "Customer did not pass OTP",
+    "Code sent to the registered SIM was never entered",
+    "One-time code expired before it was used",
+    "OTP step skipped by support override",
+    "Passcode entered incorrectly, device added anyway",
+    "No OTP sent, registered number unreachable",
+    "SMS code rejected, enrolment forced by agent",
+    "Verification code not received by the customer",
+    "OTP attempt timed out",
+    "Two-step check bypassed",
+]
+
+
+def wording_stories(b: Builder) -> None:
+    """New phones whose enrolment text varies, so reading it takes more than a phrase match."""
+    r = b.r
+    for n, (details, fraud) in enumerate([*((d, False) for d in PARAPHRASED), *((d, True) for d in NEGATED)]):
+        a = b.account(f"ACC-{70000 + n}", f"CUS-{70000 + n}", f"{FIRST[n % 20]} {LAST[n % 16]}",
+                      r.choice(CITIES), "portfolio-1" if n % 2 == 0 else "portfolio-2")
+        a["device"] = f"DEV-7{n:03d}"
+        payee = (f"BEN-{14100 + n}", "Grocer")
+        for i in range(8):
+            b.pay(a, *payee, r.uniform(1500, 3000), b.daytime(8 + i * 3), a["device"], description="Groceries")
+        b.sign_in(a, a["device"], b.daytime(9))
+        days = r.uniform(1, 5)
+        device = f"DEV-7{n:03d}N"
+        when = b.at(days)
+        b.sign_in(a, device, when)
+        b.event(a["account_id"], "device_enrolled", when, details, device)
+        b.pay(a, *payee, r.uniform(30000, 60000), b.at(days, -60), device, description="Payment",
+              story="failed_otp_enrolment" if fraud else "paraphrased_otp", fraud=fraud)
 
 
 def generate(now: datetime | None = None) -> Sample:
@@ -363,4 +413,5 @@ def generate(now: datetime | None = None) -> Sample:
     scenarios(b)
     insurance(b, accounts)
     linked_scenario(b)
+    wording_stories(b)
     return b.s

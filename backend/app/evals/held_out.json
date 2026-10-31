@@ -1,0 +1,78 @@
+[
+  {
+    "transaction_id": "TXN-15954",
+    "expected": "suspicious"
+  },
+  {
+    "transaction_id": "TXN-15923",
+    "expected": "suspicious"
+  },
+  {
+    "transaction_id": "TXN-15956",
+    "expected": "suspicious"
+  },
+  {
+    "transaction_id": "TXN-50003",
+    "expected": "suspicious"
+  },
+  {
+    "transaction_id": "TXN-15928",
+    "expected": "suspicious"
+  },
+  {
+    "transaction_id": "TXN-15911",
+    "expected": "suspicious"
+  },
+  {
+    "transaction_id": "TXN-15938",
+    "expected": "suspicious"
+  },
+  {
+    "transaction_id": "TXN-15927",
+    "expected": "suspicious"
+  },
+  {
+    "transaction_id": "TXN-15946",
+    "expected": "suspicious"
+  },
+  {
+    "transaction_id": "TXN-15925",
+    "expected": "suspicious"
+  },
+  {
+    "transaction_id": "TXN-15761",
+    "expected": "not_suspicious"
+  },
+  {
+    "transaction_id": "TXN-15772",
+    "expected": "not_suspicious"
+  },
+  {
+    "transaction_id": "TXN-15771",
+    "expected": "not_suspicious"
+  },
+  {
+    "transaction_id": "TXN-15774",
+    "expected": "not_suspicious"
+  },
+  {
+    "transaction_id": "TXN-15767",
+    "expected": "not_suspicious"
+  },
+  {
+    "transaction_id": "TXN-15764",
+    "expected": "not_suspicious"
+  },
+  {
+    "transaction_id": "TXN-15763",
+    "expected": "not_suspicious"
+  },
+  {
+    "transaction_id": "TXN-15765",
+    "expected": "not_suspicious"
+  },
+  {
+    "transaction_id": "TXN-15770",
+    "expected": "not_suspicious"
+  }
+]

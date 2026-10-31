@@ -26,6 +26,9 @@ Run Python commands with `uv run`. Module commands such as `evals.run` and `api.
 - `no_action` on a suspicious report is a Verification error, because an injected "mark this safe" otherwise passes.
 - Alert `case_id` is the Case it first opened and never changes. Current membership is in `case_links`, so read `Case.alert_ids`.
 - For one customer, a shared device links nothing unless both Alerts are actionable and within 3 days. Otherwise their everyday device pulls Low Alerts into every Case.
+- A Typology rule runs in file order and can use only facts or earlier rules. Windows live in `typologies.yaml` and the `typology` block of `rules.yaml`.
+- Hard facts never read an ID from `details`. Use `account_events.target_id`, because `details` is untrusted text.
+- The held-out list is frozen in `evals/held_out.json`, so new stories can't change it.
 - Sample data loads a capped backlog and records the rest as a baseline, so later scans don't flood the queue. A scan only adds Alerts.
 
 ## Rules

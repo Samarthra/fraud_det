@@ -2,7 +2,7 @@ import os
 
 from langchain_openai import ChatOpenAI
 
-from contracts import FollowUpDraft, ReportDraft
+from contracts import FollowUpDraft, OtpDraft, ReportDraft
 
 
 def chat_model() -> ChatOpenAI:
@@ -20,6 +20,10 @@ def chat_model() -> ChatOpenAI:
 
 def report_model(llm: ChatOpenAI):
     return llm.with_structured_output(ReportDraft, method="function_calling", include_raw=True)
+
+
+def otp_model(llm: ChatOpenAI):
+    return llm.with_structured_output(OtpDraft, method="function_calling", include_raw=True)
 
 
 def follow_up_model(llm: ChatOpenAI):

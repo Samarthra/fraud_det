@@ -1,18 +1,24 @@
 """Evals on a private in-memory copy of the sample data, so demo data is never touched."""
 
-import random
+import json
+from pathlib import Path
 
 from contracts import AnalystScope
+from correlation.consolidate import consolidate
 from demo.generator import generate
 from demo.seed import load_rows
 from detection.engine import load_config, persist, scan
 from store import Store
 
 from .metrics import detection_metrics
+from .sweep import run_sweep
 
-HELD_OUT_SEED = 7
-HELD_OUT_EACH = 10
-SCENARIOS = {"account_takeover": "TXN-50001", "false_positive": "TXN-50002"}
+HELD_OUT = Path(__file__).with_name("held_out.json")  # frozen, so new stories can't change it
+SCENARIOS = {
+    "account_takeover": "TXN-50001",
+    "false_positive": "TXN-50002",
+    "loan_diversion": "TXN-50003",
+}
 
 
 class CaseView:
@@ -42,6 +48,7 @@ class DbSource:
         self.config = load_config()
         self.candidates = scan(self.store.detection_inputs(), self.config)
         persist(self.store, self.candidates, self.config)
+        consolidate(self.store, self.config)
         self.alerts = self.store.alerts("portfolio-1")
         other = next(
             a for a in generate().customers
@@ -71,7 +78,8 @@ class DbSource:
     def _case_for(self, transaction_id: str, store: Store | None = None) -> CaseView:
         store = store or self.store
         alert = next(a for a in store.alerts("portfolio-1") if a.transaction_id == transaction_id)
-        return CaseView(store, alert.case_id)
+        case = store.get_case(alert.case_id)
+        return CaseView(store, case.merged_into or case.id)  # as an Analyst would reach it
 
     def scenario(self, name):
         return self._case_for(SCENARIOS[name])
@@ -79,22 +87,23 @@ class DbSource:
     def poisoned(self, field, text):
         store = self._fresh()
         persist(store, scan(store.detection_inputs(), self.config), self.config)
-        store._run(f"UPDATE transactions SET {field}=? WHERE transaction_id='TXN-50001'", text)
+        consolidate(store, self.config)
+        if field == "details":
+            store._run("UPDATE account_events SET details=? WHERE account_id='ACC-10042' "
+                       "AND type='device_enrolled'", text)
+        else:
+            store._run(f"UPDATE transactions SET {field}=? WHERE transaction_id='TXN-50001'", text)
         return self._case_for("TXN-50001", store)
 
     def held_out(self):
-        labels = {g["subject_id"]: bool(g["is_fraud"]) for g in self.store.ground_truth()}
-        pool = [
-            a for a in self.alerts
-            if a.case_id and a.transaction_id in labels and a.transaction_id not in SCENARIOS.values()
+        return [
+            (row["transaction_id"], self._case_for(row["transaction_id"]), row["expected"])
+            for row in json.loads(HELD_OUT.read_text())
         ]
-        rng = random.Random(HELD_OUT_SEED)
-        cases = []
-        for is_fraud, want in ((True, "suspicious"), (False, "not_suspicious")):
-            group = sorted((a for a in pool if labels[a.transaction_id] == is_fraud), key=lambda a: a.id)
-            for alert in rng.sample(group, min(HELD_OUT_EACH, len(group))):
-                cases.append((alert.transaction_id, CaseView(self.store, alert.case_id), want))
-        return cases
+
+    def sweep(self):
+        held = {row["transaction_id"] for row in json.loads(HELD_OUT.read_text())}
+        return run_sweep(self.store, held)
 
     def denial_store(self):
         return self.store

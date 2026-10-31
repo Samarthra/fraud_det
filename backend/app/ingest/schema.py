@@ -107,6 +107,7 @@ DATASETS = {
             ),
             Column("at", "timestamp"),
             Column("details", required=False),
+            Column("target_id", "id", required=False),
         ),
     ),
     "policies": Dataset(

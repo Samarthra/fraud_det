@@ -332,6 +332,7 @@ def case_report(case_id: str, scope: AnalystScope = Depends(current_scope)):
         notes=detail.notes,
         classifications=detail.classifications,
         investigation=investigation,
+        typology=investigation.typology if investigation else None,
         history=detail.history,
     )
     store.audit("report_downloaded", analyst_id=scope.analyst_id, case_id=case_id)

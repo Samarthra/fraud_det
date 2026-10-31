@@ -5,6 +5,7 @@ import re
 from functools import lru_cache
 from typing import Any
 
+from langchain_core.callbacks import BaseCallbackHandler
 from langfuse import Langfuse
 from langfuse.langchain import CallbackHandler
 from langfuse.types import MaskOtelSpansResult, OtelSpanPatch
@@ -39,16 +40,29 @@ def client() -> Langfuse:
     return Langfuse(mask_otel_spans=mask_otel_spans)
 
 
+class CallCounter(BaseCallbackHandler):
+    """Evals report model calls, because real cost can't be read back."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def on_chat_model_start(self, *args: Any, **kwargs: Any) -> None:
+        self.calls += 1
+
+
+counter = CallCounter()
+
+
 def trace_config(investigation_id: str) -> dict[str, Any]:
     """A fresh handler per invoke. The seeded ID keeps Follow-ups in the same trace."""
     if not enabled():
-        return {}
+        return {"callbacks": [counter]}
     client()
     handler = CallbackHandler(
         trace_context={"trace_id": Langfuse.create_trace_id(seed=investigation_id)}
     )
     return {
-        "callbacks": [handler],
+        "callbacks": [handler, counter],
         "metadata": {
             "langfuse_session_id": investigation_id,
             "langfuse_trace_name": "investigation",

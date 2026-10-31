@@ -10,10 +10,14 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from contracts import Report
+from contracts import Report, TypologyResult
 
 REPLAYS = Path(__file__).resolve().parents[3] / "replays"
-SCENARIO_BY_TRANSACTION = {"TXN-50001": "account_takeover", "TXN-50002": "false_positive"}
+SCENARIO_BY_TRANSACTION = {
+    "TXN-50001": "account_takeover",
+    "TXN-50002": "false_positive",
+    "TXN-50003": "loan_diversion",
+}
 ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
 
 
@@ -79,6 +83,8 @@ def load(store, case_id: str, path: Path) -> str:
         )
     for step in saved["steps"]:
         store.append_step(new_id, step["stage"], step["type"], step["summary"], step["evidence_ids"])
+    if investigation.get("typology"):
+        store.save_typology(new_id, TypologyResult.model_validate(investigation["typology"]))
     store.save_report(new_id, Report.model_validate(investigation["report"]))
     store.mark_replay(new_id, saved["captured_at"], investigation.get("trace_url"))
     return new_id

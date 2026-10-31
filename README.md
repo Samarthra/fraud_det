@@ -16,7 +16,8 @@ All data is synthetic. This prototype demonstrates controls. It doesn't claim le
 - **Case workspace:** risk assessment, timeline, relationship network, Alerts, notes and full evidence history, with a downloadable JSON report.
 - **Analyst actions:** confirm, mark false positive, request information, escalate, recommend a hold or enhanced verification, record a conclusion, change the risk classification. Recommendations are never carried out.
 - **Investigation:** a LangGraph agent chooses its own evidence tools, with live steps on screen and a Langfuse trace for each run.
-- **Verification:** code checks each amount, date and record ID against the cited Evidence, so a report that fails is marked Unverified.
+- **Typology check:** code proves named fraud and legitimate patterns from a Case's records, with a proof citing each one, and the AI reads one fact from free text. It runs on every Investigation.
+- **Verification:** code checks each amount, date and record ID against the cited Evidence, and holds the Assessment to any proof, so a report that fails is marked Unverified.
 - **Access control:** each Analyst sees only their own Portfolio, enforced at the tool and API layers, and denials are audited.
 - **Evals and Replay:** measured detection, scenario and prompt-injection results, plus a labelled playback of a saved real Investigation for when a live run isn't possible.
 
@@ -98,6 +99,7 @@ It writes `evals/results/latest.json`, which the Evaluations screen shows.
 | `backend/app/tools/` | Evidence tools |
 | `backend/app/detection/` | Rules and scoring |
 | `backend/app/correlation/` | Consolidation, prioritisation, Case workspace |
+| `backend/app/typology/` | Typology evaluator, facts and text reader. Rules are in `detection/typologies.yaml` |
 | `backend/app/ingest/` | Upload parsing and validation |
 | `backend/app/demo/` | Sample data, Replay |
 | `backend/app/evals/` | Eval suite |

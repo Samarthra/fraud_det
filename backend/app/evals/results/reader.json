@@ -1,0 +1,70 @@
+{
+  "phrase_match": {
+    "correct": 12,
+    "total": 24,
+    "rate": 0.5,
+    "misses": [
+      {
+        "details": "Customer entered the one-time code sent to their registered number",
+        "expected": true
+      },
+      {
+        "details": "Enrolment confirmed with the code texted to the phone on file",
+        "expected": true
+      },
+      {
+        "details": "One time passcode verified against the registered mobile",
+        "expected": true
+      },
+      {
+        "details": "Device approved after the customer keyed in the SMS code",
+        "expected": true
+      },
+      {
+        "details": "Code delivered to the registered SIM was entered correctly",
+        "expected": true
+      },
+      {
+        "details": "Customer completed two-step check using their registered phone",
+        "expected": true
+      },
+      {
+        "details": "OTP challenge cleared on the first attempt",
+        "expected": true
+      },
+      {
+        "details": "Security code from the registered number matched",
+        "expected": true
+      },
+      {
+        "details": "Authenticated by a verification code on the customer's own SIM",
+        "expected": true
+      },
+      {
+        "details": "Passcode sent by text was confirmed by the customer",
+        "expected": true
+      },
+      {
+        "details": "Registered mobile received the code and the customer entered it",
+        "expected": true
+      },
+      {
+        "details": "Second factor passed using the SIM on record",
+        "expected": true
+      }
+    ]
+  },
+  "llm": {
+    "correct": 23,
+    "total": 24,
+    "rate": 0.958,
+    "misses": [
+      {
+        "details": "Customer completed two-step check using their registered phone",
+        "expected": true
+      }
+    ]
+  },
+  "problems": [],
+  "llm_stays": true
+}

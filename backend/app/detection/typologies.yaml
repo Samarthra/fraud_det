@@ -1,0 +1,121 @@
+# Typology rules. Rules run in file order and may use only facts or earlier heads.
+# Every window lives here. Times are seconds.
+- id: password_reset_signal
+  head: [compromise, $a, $x, $t]
+  when:
+    - fact: [event, $x, $a, password_reset, _, $t]
+      say: Password reset
+- id: sim_swap_signal
+  head: [compromise, $a, $x, $t]
+  when:
+    - fact: [event, $x, $a, sim_swap, _, $t]
+      say: SIM swap
+- id: failed_logins_signal
+  head: [compromise, $a, $x, $t]
+  when:
+    - fact: [failed_then_success, $x, $a, $n, $t]
+      say: "{n} failed logins, then a success"
+- id: fresh_payment
+  head: [fresh_payment, $p, $a, $b, $amt, $d, $t]
+  when:
+    - fact: [payment, $p, $a, $b, $amt, $d, $t]
+      say: "{p} pays first-time beneficiary {b}, {amt}"
+    - fact: [first_payment, $p]
+
+- id: account_takeover
+  typology: fraud
+  name: Account takeover
+  report_near: true
+  head: [account_takeover, $a, $b]
+  when:
+    - fact: [compromise, $a, $x, $tc]
+      missing: a compromise signal within 2 hours
+    - fact: [fresh_payment, $p, $a, $b, $amt, $d, $t]
+      missing: a payment to a first-time beneficiary
+    - test: [within, $tc, $t, 7200]
+      missing: the compromise and the payment within 2 hours
+    - fact: [new_device, $p, $d]
+      say: "{d} is new to this account"
+      missing: a device new to this account
+    - test: [in_window, $t]
+
+- id: mule_payment
+  typology: fraud
+  name: Mule payment
+  head: [mule_payment, $a, $b]
+  when:
+    - fact: [fresh_payment, $p, $a, $b, $amt, $d, $t]
+    - fact: [payer_count, $p, $n]
+      say: "{n} accounts paid {b} within 7 days, some possibly outside your Portfolio"
+    - test: [at_least, $n, 5]
+    - test: [in_window, $t]
+
+- id: loan_proceeds_diversion
+  typology: fraud
+  name: Loan proceeds diversion
+  report_near: true
+  near_needs_first: true  # with no loan at all, this was never close
+  head: [loan_proceeds_diversion, $a, $l]
+  when:
+    - fact: [payout, $l, $a, $loan_amt, $tl]
+      say: "{l} paid out {loan_amt} into {a}"
+      missing: a loan payout into the account
+    - fact: [fresh_payment, $p, $a, $b, $amt, $d, $t]
+      missing: a payment to a first-time beneficiary
+    - test: [within, $tl, $t, 259200]
+      missing: the payment within 72 hours of the payout
+    - test: [share_at_least, $amt, $loan_amt, 0.5]
+      missing: a payment of at least half the loan
+    - test: [in_window, $t]
+
+- id: staged_claim_ring
+  typology: fraud
+  name: Staged claim ring
+  head: [staged_claim_ring, $a, $c]
+  when:
+    - fact: [claim, $c, $a, $t]
+      say: "Claim {c} on this customer"
+    - fact: [shared_claim, $c, $m, $k, $v, $t2]
+      say: "{c} shares {k} {v} with {m}"
+    - test: [near, $t, $t2, 2592000]
+    - test: [in_window, $t]
+
+- id: verified_device_change
+  typology: legitimate
+  name: Verified device change
+  report_near: true
+  head: [verified_device_change, $a, $d]
+  when:
+    - fact: [event, $e, $a, device_enrolled, $d, $t]
+      say: "{d} enrolled"
+      missing: a device enrolment event
+    - test: [in_window, $t]
+    - fact: [otp_verified, $e, $quote]
+      say: The record says OTP was passed
+      missing: confirmation that OTP was passed
+    - absent:
+        - fact: [failed_login, $l, $a, $tl]
+        - test: [within, $tl, $t, 86400]
+      say: No failed login in the 24 hours before
+    - absent:
+        - fact: [event, $s, $a, sim_swap, _, $ts]
+        - test: [within, $ts, $t, 86400]
+      say: No SIM swap in the 24 hours before
+    - absent:
+        - fact: [event, $r, $a, password_reset, _, $tr]
+        - test: [within, $tr, $t, 86400]
+      say: No password reset in the 24 hours before
+
+- id: established_payee
+  typology: legitimate
+  name: Established payee
+  head: [established_payee, $a, $b]
+  when:
+    - fact: [event, $e, $a, beneficiary_added, $b, $ta]
+      say: "{b} was added"
+    - fact: [fresh_payment, $p, $a, $b, $amt, $d, $t]
+    - test: [in_window, $t]
+    - test: [gap_at_least, $ta, $t, 86400]
+      say: Added at least 24 hours before its first payment
+    - fact: [only_payer, $a, $b]
+      say: "Only this account has paid {b}"
