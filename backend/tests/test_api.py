@@ -274,3 +274,14 @@ def test_reset_needs_an_analyst_and_keeps_the_audit_trail(client):
     client.post("/demo/reset", headers=ONE)
     events = [e["event"] for e in client.get("/audit", headers=ONE).json()]
     assert "decision_recorded" in events and "demo_reset" in events
+
+
+def test_graph_needs_an_analyst_and_stays_in_the_portfolio(client):
+    assert client.get("/graph").status_code == 401
+    one = client.get("/graph", headers=ONE).json()
+    accounts = {n["id"] for n in one["nodes"] if n["type"] == "account"}
+    assert accounts and all(main.store.account_portfolio(a) == "portfolio-1" for a in accounts)
+    ids = {n["id"] for n in one["nodes"]}
+    assert all(e["source"] in ids and e["target"] in ids for e in one["edges"])
+    other = {n["id"] for n in client.get("/graph", headers=TWO).json()["nodes"] if n["type"] == "account"}
+    assert not accounts & other
