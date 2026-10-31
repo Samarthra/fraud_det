@@ -130,6 +130,13 @@ class ReportDraft(BaseModel):
     recommended_actions: list[Action]
 
 
+class FollowUpDraft(BaseModel):
+    """Filled in through a forced tool, using existing Evidence only."""
+
+    answer: str
+    evidence_ids: list[str]
+
+
 class Report(BaseModel):
     assessment: Assessment | None  # null only on an empty report
     summary: str

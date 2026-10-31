@@ -1,0 +1,57 @@
+from agent.verification import verify
+from contracts import Evidence, Finding, ReportDraft
+
+
+def ev(id, data):
+    return Evidence(id=id, investigation_id="I", kind="transaction", source_ref=id, data=data, collected_at="t")
+
+
+EVIDENCE = [
+    ev("EV-1", {"transaction_id": "TXN-50001", "amount": 185000.0, "timestamp": "2026-10-31T16:21:00+05:30", "account_id": "ACC-10042"}),
+    ev("EV-2", {"median_outgoing_30d": 4200.0, "paying_accounts_7d": 6}),
+]
+
+
+def errors(statement, ids=("EV-1",)):
+    draft = ReportDraft(assessment="suspicious", summary="s", limitations=[], recommended_actions=[],
+                        findings=[Finding(statement=statement, evidence_ids=list(ids))])
+    return verify(draft, EVIDENCE)
+
+
+def test_matching_facts_pass_in_every_amount_format():
+    for amount in ("185000", "₹1,85,000", "185,000.00", "₹ 185000"):
+        assert errors(f"TXN-50001 on ACC-10042 sent {amount} on 2026-10-31.") == []
+
+
+def test_small_counts_are_not_treated_as_amounts():
+    assert errors("6 accounts paid in 7 days over a 30-day window.", ["EV-2"]) == []
+
+
+def test_wrong_amount_fails():
+    assert "Amount ₹1,84,000" in errors("Sent ₹1,84,000.")[0]
+
+
+def test_right_amount_cited_to_wrong_evidence_fails():
+    assert errors("Sent 185000.", ["EV-2"])
+
+
+def test_wrong_date_and_record_id_fail():
+    assert len(errors("TXN-99999 on ACC-10099 on 2026-10-01.")) == 3
+
+
+def test_unknown_or_missing_citations_fail():
+    assert "unknown Evidence EV-9" in errors("Fine.", ["EV-9"])[0]
+    assert "cites no Evidence" in errors("Fine.", [])[0]
+
+
+def test_no_findings_fails():
+    draft = ReportDraft(assessment="not_suspicious", summary="s", findings=[], limitations=[], recommended_actions=[])
+    assert verify(draft, EVIDENCE) == ["The report has no findings."]
+
+
+def test_record_id_in_the_source_ref_counts():
+    row = Evidence(id="EV-3", investigation_id="I", kind="account_event",
+                   source_ref="ACC-10042/sim_swap/t", data={"type": "sim_swap"}, collected_at="t")
+    draft = ReportDraft(assessment="suspicious", summary="s", limitations=[], recommended_actions=[],
+                        findings=[Finding(statement="ACC-10042 had a SIM swap.", evidence_ids=["EV-3"])])
+    assert verify(draft, [row]) == []
